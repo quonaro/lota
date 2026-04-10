@@ -423,7 +423,6 @@ func TestParseConfig_InvalidYAML(t *testing.T) {
 
 func TestParseConfig_WithGroupArgs(t *testing.T) {
 	yamlContent := `
-name: test-app
 args:
 - environment|env:str="dev"
 - verbose|v:bool=false
@@ -440,12 +439,10 @@ group1:
     script: echo "{{environment}} {{param1}} {{timeout}}"
 `
 
-	tmpFile := "/tmp/test_group_args_config.yml"
-	err := os.WriteFile(tmpFile, []byte(yamlContent), 0644)
-	if err != nil {
+	tmpFile := filepath.Join(t.TempDir(), "test_group_args_config.yml")
+	if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
 	config, err := ParseConfig(tmpFile)
 	if err != nil {
@@ -502,7 +499,6 @@ group1:
 
 func TestParseConfig_WithAppLevelCommandsWithArgs(t *testing.T) {
 	yamlContent := `
-name: test-app
 args:
 - global_flag|g:bool=false
 
@@ -513,12 +509,10 @@ top-level-command:
   script: echo "{{global_flag}} {{local_param}}"
 `
 
-	tmpFile := "/tmp/test_app_level_args_config.yml"
-	err := os.WriteFile(tmpFile, []byte(yamlContent), 0644)
-	if err != nil {
+	tmpFile := filepath.Join(t.TempDir(), "test_app_level_args_config.yml")
+	if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
 		t.Fatalf("Failed to write temp file: %v", err)
 	}
-	defer os.Remove(tmpFile)
 
 	config, err := ParseConfig(tmpFile)
 	if err != nil {

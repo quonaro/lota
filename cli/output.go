@@ -11,25 +11,21 @@ import (
 const defaultInitTemplate = `# lota.yml
 
 vars:
-  - name: PROJECT
-    value: myproject
+- PROJECT=myproject
 
-commands:
-  - name: hello
-    desc: Print a greeting
-    script: echo "Hello, {{PROJECT}}!"
+hello:
+  desc: Print a greeting
+  script: echo "Hello, {{PROJECT}}!"
 `
 
-// PrintError prints a formatted error message and exits
+// PrintError prints a formatted error message to stderr
 func PrintError(message string) {
-	fmt.Printf("ERROR: %s\n", message)
-	os.Exit(1)
+	fmt.Fprintf(os.Stderr, "ERROR: %s\n", message)
 }
 
-// PrintErrorf prints a formatted error message with printf-style formatting
+// PrintErrorf prints a formatted error message to stderr
 func PrintErrorf(format string, args ...interface{}) {
-	fmt.Printf("ERROR: "+format+"\n", args...)
-	os.Exit(1)
+	fmt.Fprintf(os.Stderr, "ERROR: "+format+"\n", args...)
 }
 
 // PrintVersion prints version information
@@ -42,7 +38,7 @@ func PrintVersion() {
 func PrintHelp(configPath string) {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		fmt.Printf("Error loading config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		return
 	}
 

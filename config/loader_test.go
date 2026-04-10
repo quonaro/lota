@@ -87,7 +87,10 @@ func TestIsDir(t *testing.T) {
 }
 
 func TestCurrentDir(t *testing.T) {
-	dir := CurrentDir()
+	dir, err := CurrentDir()
+	if err != nil {
+		t.Fatalf("CurrentDir() error: %v", err)
+	}
 	if dir == "" {
 		t.Error("CurrentDir() returned empty string")
 	}
@@ -107,7 +110,11 @@ func TestGetConfig_EmptyPath(t *testing.T) {
 		t.Fatalf("GetConfigPath(empty) failed: %v", err)
 	}
 
-	expectedPath := filepath.Join(CurrentDir(), shared.ConfigFileName)
+	currentDir, err := CurrentDir()
+	if err != nil {
+		t.Fatalf("CurrentDir() error: %v", err)
+	}
+	expectedPath := filepath.Join(currentDir, shared.ConfigFileName)
 	if config.Path != expectedPath {
 		t.Errorf("GetConfigPath(empty) = %v, want %v", config.Path, expectedPath)
 	}

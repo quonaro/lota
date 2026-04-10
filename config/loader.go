@@ -19,17 +19,21 @@ func isDir(path string) bool {
 	return info.IsDir()
 }
 
-func CurrentDir() string {
+func CurrentDir() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		panic(fmt.Errorf("failed to get current dir: %w", err))
+		return "", fmt.Errorf("failed to get current dir: %w", err)
 	}
-	return dir
+	return dir, nil
 }
 
 func GetConfigPath(path string) (*FileConfig, error) {
 	if path == "" {
-		path = filepath.Join(CurrentDir(), shared.ConfigFileName)
+		dir, err := CurrentDir()
+		if err != nil {
+			return nil, err
+		}
+		path = filepath.Join(dir, shared.ConfigFileName)
 	} else if isDir(path) {
 		path = filepath.Join(path, shared.ConfigFileName)
 	}

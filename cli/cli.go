@@ -36,7 +36,7 @@ func Run() error {
 
 	result := FindCommand(cfg, cmdPath)
 	if !result.Exists {
-		PrintErrorf("Command not found: %s", strings.Join(cmdPath, " "))
+		return fmt.Errorf("command not found: %s", strings.Join(cmdPath, " "))
 	}
 
 	if result.Exists && result.Group != nil && result.Command == nil {

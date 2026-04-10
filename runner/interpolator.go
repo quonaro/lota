@@ -10,8 +10,6 @@ import (
 
 var placeholderRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
 
-const defaultMaxArrayElements = 5
-
 // ValidationError represents an interpolation validation error
 type ValidationError struct {
 	Placeholder string
@@ -47,13 +45,15 @@ func Interpolate(script string, context InterpolationContext) (string, error) {
 	return result, nil
 }
 
-// findPlaceholders extracts all {{placeholder}} patterns from script
+// findPlaceholders extracts all unique {{placeholder}} patterns from script
 func findPlaceholders(script string) []string {
 	matches := placeholderRegex.FindAllStringSubmatch(script, -1)
 
+	seen := make(map[string]bool)
 	placeholders := make([]string, 0, len(matches))
 	for _, match := range matches {
-		if len(match) > 1 {
+		if len(match) > 1 && !seen[match[1]] {
+			seen[match[1]] = true
 			placeholders = append(placeholders, match[1])
 		}
 	}

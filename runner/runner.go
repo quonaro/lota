@@ -80,7 +80,7 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunO
 	if cmd.Script != "" {
 		interpolatedScript, err := Interpolate(cmd.Script, context)
 		if err != nil {
-			return fmt.Errorf("%w", err)
+			return err
 		}
 		if opts.Verbose {
 			fmt.Printf("[verbose] script: %s\n", interpolatedScript)

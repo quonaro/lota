@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -76,7 +77,7 @@ func HandleGlobalFlags(flags GlobalFlags) bool {
 
 	if flags.Init {
 		if err := InitConfig(flags.Config); err != nil {
-			fmt.Printf("ERROR: %s\n", err)
+			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		}
 		return true
 	}

@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const defaultMaxArrayElements = 5
+
 // ParseArgs converts command line arguments to a map based on argument definitions.
 // Supports wildcard handling, boolean flags, and validation.
 func ParseArgs(cliArgs []string, argDefs []config.Arg) (map[string]string, error) {
