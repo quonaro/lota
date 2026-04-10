@@ -11,20 +11,25 @@ import (
 func Run() error {
 	if len(os.Args) < 2 {
 		PrintHelp("")
-		os.Exit(0)
+		return nil
 	}
 
 	cliArgs := os.Args[1:]
 
-	flags, remainingArgs := ParseGlobalFlags(cliArgs)
+	flags, remainingArgs, err := ParseGlobalFlags(cliArgs)
+	if err != nil {
+		return err
+	}
 
-	if HandleGlobalFlags(flags) {
-		os.Exit(0)
+	if shouldExit, err := HandleGlobalFlags(flags); err != nil {
+		return err
+	} else if shouldExit {
+		return nil
 	}
 
 	if len(remainingArgs) == 0 {
 		PrintHelp(flags.Config)
-		os.Exit(0)
+		return nil
 	}
 
 	cfg, err := LoadConfig(flags.Config)
@@ -39,15 +44,15 @@ func Run() error {
 		return fmt.Errorf("command not found: %s", strings.Join(cmdPath, " "))
 	}
 
-	if result.Exists && result.Group != nil && result.Command == nil {
+	if result.Group != nil && result.Command == nil {
 		PrintGroupHelp(result.Group)
-		os.Exit(0)
+		return nil
 	}
 
 	for _, arg := range cmdArgs {
 		if arg == "--help" || arg == "-h" {
 			PrintCommandHelp(result)
-			os.Exit(0)
+			return nil
 		}
 	}
 

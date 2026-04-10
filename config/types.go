@@ -35,18 +35,18 @@ type Command struct {
 }
 
 type Arg struct {
-	Name     string `yaml:"name"`
-	Short    string `yaml:"short"`
-	Type     string `yaml:"type"`
-	Default  string `yaml:"default"`
-	Required bool   `yaml:"required"`
-	Wildcard bool   `yaml:"wildcard"`
-	MaxArr   *int   `yaml:"max_arr"`
+	Name     string
+	Short    string
+	Type     string
+	Default  string
+	Required bool
+	Wildcard bool
+	MaxArr   *int
 }
 
 type Var struct {
-	Name  string `yaml:"name"`
-	Value string `yaml:"value"`
+	Name  string
+	Value string
 }
 
 type SearchResult struct {

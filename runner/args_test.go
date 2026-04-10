@@ -125,6 +125,24 @@ func TestParseArgs(t *testing.T) {
 				"optional": "default",
 			},
 		},
+		{
+			name:    "-- separator passes flags to wildcard",
+			cliArgs: []string{"myservice", "--", "--docker-flag", "--another"},
+			argDefs: []config.Arg{
+				{Name: "service", Type: "str"},
+				{Name: "cmd", Wildcard: true},
+			},
+			expected: map[string]string{
+				"service": "myservice",
+				"cmd":     "--docker-flag --another",
+			},
+		},
+		{
+			name:        "-- without wildcard returns error",
+			cliArgs:     []string{"--"},
+			argDefs:     []config.Arg{},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {

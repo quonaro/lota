@@ -47,6 +47,21 @@ func ParseArgs(cliArgs []string, argDefs []config.Arg) (map[string]string, error
 	for i < len(cliArgs) {
 		arg := cliArgs[i]
 
+		// -- signals end of flags; collect everything remaining into wildcard
+		if arg == "--" {
+			i++
+			if wildcardArg == nil {
+				return nil, fmt.Errorf("unexpected argument separator '--'")
+			}
+			wildcardValues := make([]string, 0, len(cliArgs)-i)
+			for i < len(cliArgs) {
+				wildcardValues = append(wildcardValues, cliArgs[i])
+				i++
+			}
+			result[wildcardArg.Name] = strings.Join(wildcardValues, " ")
+			break
+		}
+
 		if strings.HasPrefix(arg, "-") && len(arg) > 1 {
 			flagName := arg
 			var value string

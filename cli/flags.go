@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -21,7 +20,7 @@ type GlobalFlags struct {
 // Only flags that appear before the first non-flag token (command name) are
 // treated as global flags. Everything from the first non-flag token onward
 // (including any flags mixed in after it) is returned as remaining args.
-func ParseGlobalFlags(args []string) (GlobalFlags, []string) {
+func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 	flags := GlobalFlags{}
 	i := 0
 
@@ -45,10 +44,11 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string) {
 		case "--init":
 			flags.Init = true
 		case "--config":
-			if i+1 < len(args) {
-				i++
-				flags.Config = args[i]
+			if i+1 >= len(args) {
+				return GlobalFlags{}, nil, fmt.Errorf("flag --config requires a value")
 			}
+			i++
+			flags.Config = args[i]
 		default:
 			known = false
 		}
@@ -59,28 +59,29 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string) {
 		i++
 	}
 
-	return flags, args[i:]
+	return flags, args[i:], nil
 }
 
 // HandleGlobalFlags handles global flags.
-// Returns true if program should exit after handling.
-func HandleGlobalFlags(flags GlobalFlags) bool {
+// Returns (true, nil) if the program should exit normally,
+// (true, err) if it should exit with an error.
+func HandleGlobalFlags(flags GlobalFlags) (bool, error) {
 	if flags.Help {
 		PrintHelp(flags.Config)
-		return true
+		return true, nil
 	}
 
 	if flags.Version {
 		PrintVersion()
-		return true
+		return true, nil
 	}
 
 	if flags.Init {
 		if err := InitConfig(flags.Config); err != nil {
-			fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+			return true, err
 		}
-		return true
+		return true, nil
 	}
 
-	return false
+	return false, nil
 }
