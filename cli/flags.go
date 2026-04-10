@@ -66,6 +66,16 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 	return flags, args[i:], nil
 }
 
+// hasHelpFlag checks if --help or -h appears anywhere in the args
+func hasHelpFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
 // validateFlags checks for conflicting flag combinations
 func validateFlags(flags GlobalFlags) error {
 	if flags.Init && (flags.Help || flags.Version || flags.Verbose || flags.DryRun) {

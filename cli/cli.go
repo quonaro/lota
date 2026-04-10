@@ -47,6 +47,11 @@ func Run() error {
 		return nil
 	}
 
+	if hasHelpFlag(cmdArgs) {
+		PrintCommandHelp(result)
+		return nil
+	}
+
 	opts := runner.RunOptions{
 		Verbose: flags.Verbose,
 		DryRun:  flags.DryRun,
