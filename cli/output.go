@@ -55,19 +55,21 @@ func PrintHelp(configPath string) {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
-	} else {
-		fmt.Println("Commands:")
-
-		for _, group := range cfg.Groups {
-			fmt.Printf("  %-10s %s\n", group.Name, group.Desc)
-		}
-
-		for _, cmd := range cfg.Commands {
-			fmt.Printf("  %-10s %s\n", cmd.Name, cmd.Desc)
-		}
-
-		fmt.Println()
+		printGlobalOptions()
+		return
 	}
+
+	fmt.Println("Commands:")
+
+	for _, group := range cfg.Groups {
+		fmt.Printf("  %-10s %s\n", group.Name, group.Desc)
+	}
+
+	for _, cmd := range cfg.Commands {
+		fmt.Printf("  %-10s %s\n", cmd.Name, cmd.Desc)
+	}
+
+	fmt.Println()
 	printGlobalOptions()
 }
 

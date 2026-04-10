@@ -59,7 +59,19 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 		i++
 	}
 
+	if err := validateFlags(flags); err != nil {
+		return GlobalFlags{}, nil, err
+	}
+
 	return flags, args[i:], nil
+}
+
+// validateFlags checks for conflicting flag combinations
+func validateFlags(flags GlobalFlags) error {
+	if flags.Init && (flags.Help || flags.Version || flags.Verbose || flags.DryRun) {
+		return fmt.Errorf("--init cannot be used with --help, --version, --verbose, or --dry-run")
+	}
+	return nil
 }
 
 // HandleGlobalFlags handles global flags.

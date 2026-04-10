@@ -49,13 +49,6 @@ func Run() error {
 		return nil
 	}
 
-	for _, arg := range cmdArgs {
-		if arg == "--help" || arg == "-h" {
-			PrintCommandHelp(result)
-			return nil
-		}
-	}
-
 	opts := runner.RunOptions{
 		Verbose: flags.Verbose,
 		DryRun:  flags.DryRun,

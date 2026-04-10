@@ -2,6 +2,7 @@ package cli
 
 import (
 	"lota/config"
+	"reflect"
 	"testing"
 )
 
@@ -53,10 +54,10 @@ func TestParseCommandPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path, args := ParseCommandPath(tt.input)
-			if !stringSlicesEqual(path, tt.expectedPath) {
+			if !reflect.DeepEqual(path, tt.expectedPath) {
 				t.Errorf("path = %v, want %v", path, tt.expectedPath)
 			}
-			if !stringSlicesEqual(args, tt.expectedArgs) {
+			if !reflect.DeepEqual(args, tt.expectedArgs) {
 				t.Errorf("args = %v, want %v", args, tt.expectedArgs)
 			}
 		})
@@ -160,7 +161,7 @@ func TestParseGlobalFlags(t *testing.T) {
 			if flags != tt.expectedFlags {
 				t.Errorf("flags = %+v, want %+v", flags, tt.expectedFlags)
 			}
-			if !stringSlicesEqual(remaining, tt.expectedArgs) {
+			if !reflect.DeepEqual(remaining, tt.expectedArgs) {
 				t.Errorf("remaining = %v, want %v", remaining, tt.expectedArgs)
 			}
 		})
@@ -256,14 +257,3 @@ func TestFindCommand(t *testing.T) {
 	}
 }
 
-func stringSlicesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
