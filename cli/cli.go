@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"lota/runner"
 	"os"
 	"strings"
 )
@@ -9,7 +10,7 @@ import (
 // Run executes the CLI application
 func Run() error {
 	if len(os.Args) < 2 {
-		PrintHelp()
+		PrintHelp("")
 		os.Exit(0)
 	}
 
@@ -22,11 +23,11 @@ func Run() error {
 	}
 
 	if len(remainingArgs) == 0 {
-		PrintHelp()
+		PrintHelp(flags.Config)
 		os.Exit(0)
 	}
 
-	cfg, err := LoadConfig()
+	cfg, err := LoadConfig(flags.Config)
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
 	}
@@ -50,5 +51,9 @@ func Run() error {
 		}
 	}
 
-	return RunCommand(cfg, result, cmdArgs)
+	opts := runner.RunOptions{
+		Verbose: flags.Verbose,
+		DryRun:  flags.DryRun,
+	}
+	return RunCommand(cfg, result, cmdArgs, opts)
 }

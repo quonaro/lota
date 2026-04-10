@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"lota/config"
 	"regexp"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 var placeholderRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
@@ -45,29 +45,6 @@ func Interpolate(script string, context InterpolationContext) (string, error) {
 	}
 
 	return result, nil
-}
-
-// InterpolateSimple is a simplified version for backward compatibility.
-// On error, silently skips unresolved placeholders instead of failing.
-func InterpolateSimple(script string, vars map[string]string, args map[string]string) string {
-	context := InterpolationContext{
-		Vars:    vars,
-		Args:    args,
-		ArgDefs: []config.Arg{},
-	}
-
-	result, err := Interpolate(script, context)
-	if err != nil {
-		result = script
-		for name, value := range vars {
-			result = strings.ReplaceAll(result, "{{"+name+"}}", value)
-		}
-		for name, value := range args {
-			result = strings.ReplaceAll(result, "{{"+name+"}}", value)
-		}
-	}
-
-	return result
 }
 
 // findPlaceholders extracts all {{placeholder}} patterns from script

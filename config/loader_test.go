@@ -46,34 +46,6 @@ func TestGetConfig(t *testing.T) {
 	}
 }
 
-func TestFileConfig_Read(t *testing.T) {
-	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, "test_config.yml")
-	expectedContent := []byte("name: test\nvars:\n  - KEY=value")
-
-	if err := os.WriteFile(configPath, expectedContent, 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	config := &FileConfig{Path: configPath}
-	content, err := config.Read()
-	if err != nil {
-		t.Fatalf("Read() failed: %v", err)
-	}
-
-	if string(content) != string(expectedContent) {
-		t.Errorf("Read() = %v, want %v", string(content), string(expectedContent))
-	}
-}
-
-func TestFileConfig_Read_FileNotFound(t *testing.T) {
-	config := &FileConfig{Path: "/nonexistent/path/config.yml"}
-	_, err := config.Read()
-	if err == nil {
-		t.Error("Expected error for non-existent file, got nil")
-	}
-}
-
 func TestIsDir(t *testing.T) {
 	tempDir := t.TempDir()
 

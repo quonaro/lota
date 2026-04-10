@@ -7,6 +7,12 @@ import (
 	"os/exec"
 )
 
+// RunOptions controls execution behavior
+type RunOptions struct {
+	Verbose bool
+	DryRun  bool
+}
+
 // executeShell runs a script in shell with environment variables
 func executeShell(script string, env []string) error {
 	cmd := exec.Command("sh", "-c", script)
@@ -16,8 +22,20 @@ func executeShell(script string, env []string) error {
 	return cmd.Run()
 }
 
-func ExecuteCommand(cmd *config.Command, context InterpolationContext) error {
+func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunOptions) error {
 	env := VarsToEnv(context.Vars)
+
+	if opts.Verbose {
+		fmt.Printf("[verbose] command: %s\n", cmd.Name)
+		fmt.Println("[verbose] vars:")
+		for k, v := range context.Vars {
+			fmt.Printf("  %s=%s\n", k, v)
+		}
+		fmt.Println("[verbose] args:")
+		for k, v := range context.Args {
+			fmt.Printf("  %s=%s\n", k, v)
+		}
+	}
 
 	// before hook
 	if cmd.Before != "" {
@@ -25,8 +43,15 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext) error {
 		if err != nil {
 			return fmt.Errorf("before hook interpolation failed: %w", err)
 		}
-		if err := executeShell(interpolatedBefore, env); err != nil {
-			return fmt.Errorf("before hook failed: %w", err)
+		if opts.Verbose {
+			fmt.Printf("[verbose] before: %s\n", interpolatedBefore)
+		}
+		if opts.DryRun {
+			fmt.Printf("[dry-run] before:\n%s\n", interpolatedBefore)
+		} else {
+			if err := executeShell(interpolatedBefore, env); err != nil {
+				return fmt.Errorf("before hook failed: %w", err)
+			}
 		}
 	}
 
@@ -36,6 +61,13 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext) error {
 			interpolatedAfter, err := Interpolate(cmd.After, context)
 			if err != nil {
 				fmt.Printf("after hook interpolation failed: %v\n", err)
+				return
+			}
+			if opts.Verbose {
+				fmt.Printf("[verbose] after: %s\n", interpolatedAfter)
+			}
+			if opts.DryRun {
+				fmt.Printf("[dry-run] after:\n%s\n", interpolatedAfter)
 				return
 			}
 			if err := executeShell(interpolatedAfter, env); err != nil {
@@ -49,6 +81,13 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext) error {
 		interpolatedScript, err := Interpolate(cmd.Script, context)
 		if err != nil {
 			return fmt.Errorf("%w", err)
+		}
+		if opts.Verbose {
+			fmt.Printf("[verbose] script: %s\n", interpolatedScript)
+		}
+		if opts.DryRun {
+			fmt.Printf("[dry-run] script:\n%s\n", interpolatedScript)
+			return nil
 		}
 		return executeShell(interpolatedScript, env)
 	}

@@ -7,14 +7,15 @@ import (
 	"strings"
 )
 
-// LoadConfig loads and indexes the configuration
-func LoadConfig() (*config.AppConfig, error) {
-	configPath, err := config.GetConfigPath("lota.yml")
+// LoadConfig loads and indexes the configuration.
+// configPath can be empty (uses default lota.yml), a file path, or a directory.
+func LoadConfig(configPath string) (*config.AppConfig, error) {
+	fc, err := config.GetConfigPath(configPath)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg, err := config.ParseConfig(configPath.Path)
+	cfg, err := config.ParseConfig(fc.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +68,7 @@ func FindCommand(cfg *config.AppConfig, path []string) config.SearchResult {
 }
 
 // RunCommand executes a command with CLI arguments
-func RunCommand(cfg *config.AppConfig, result config.SearchResult, cliArgs []string) error {
+func RunCommand(cfg *config.AppConfig, result config.SearchResult, cliArgs []string, opts runner.RunOptions) error {
 	if result.Command == nil {
 		return fmt.Errorf("not a command")
 	}
@@ -87,5 +88,5 @@ func RunCommand(cfg *config.AppConfig, result config.SearchResult, cliArgs []str
 		ArgDefs: args,
 	}
 
-	return runner.ExecuteCommand(result.Command, context)
+	return runner.ExecuteCommand(result.Command, context, opts)
 }

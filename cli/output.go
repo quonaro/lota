@@ -8,6 +8,18 @@ import (
 	"strings"
 )
 
+const defaultInitTemplate = `# lota.yml
+
+vars:
+  - name: PROJECT
+    value: myproject
+
+commands:
+  - name: hello
+    desc: Print a greeting
+    script: echo "Hello, {{PROJECT}}!"
+`
+
 // PrintError prints a formatted error message and exits
 func PrintError(message string) {
 	fmt.Printf("ERROR: %s\n", message)
@@ -22,13 +34,13 @@ func PrintErrorf(format string, args ...interface{}) {
 
 // PrintVersion prints version information
 func PrintVersion() {
-	fmt.Printf("%s version %s\n", shared.AppName, shared.AppVersion)
+	fmt.Printf("%s version %s\n", shared.AppName, shared.Version)
 	fmt.Println(shared.AppDescription)
 }
 
 // PrintHelp displays available commands
-func PrintHelp() {
-	cfg, err := LoadConfig()
+func PrintHelp(configPath string) {
+	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		fmt.Printf("Error loading config: %v\n", err)
 		return
@@ -46,8 +58,31 @@ func PrintHelp() {
 
 	fmt.Println()
 	fmt.Println("Global Options:")
-	fmt.Println("  -h, --help     Print help information")
-	fmt.Println("  -v, --verbose  Enable detailed logging for debugging")
+	fmt.Println("  -h, --help       Print help information")
+	fmt.Println("  -v, --verbose    Enable detailed logging")
+	fmt.Println("      --dry-run    Show interpolated scripts without executing")
+	fmt.Println("  -V, --version    Print version information")
+	fmt.Println("      --init       Create a default lota.yml in current directory")
+	fmt.Println("      --config     Path to config file or directory")
+}
+
+// InitConfig creates a default lota.yml at the given path (or current dir if empty)
+func InitConfig(configPath string) error {
+	path := configPath
+	if path == "" {
+		path = shared.ConfigFileName
+	}
+
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("%s already exists", path)
+	}
+
+	if err := os.WriteFile(path, []byte(defaultInitTemplate), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+
+	fmt.Printf("Created %s\n", path)
+	return nil
 }
 
 // PrintCommandHelp displays help for a specific command
@@ -87,6 +122,30 @@ func PrintCommandHelp(result config.SearchResult) {
 		fmt.Println()
 	}
 
+	if cmd.Script != "" {
+		fmt.Println("Script:")
+		fmt.Println("  " + cmd.Script)
+		fmt.Println()
+	}
+
+	if cmd.Before != "" {
+		fmt.Println("Before hook:")
+		fmt.Println("  " + cmd.Before)
+		fmt.Println()
+	}
+
+	if cmd.After != "" {
+		fmt.Println("After hook:")
+		fmt.Println("  " + cmd.After)
+		fmt.Println()
+	}
+	fmt.Println("Global Options:")
+	fmt.Println("  -h, --help       Print help information")
+	fmt.Println("  -v, --verbose    Enable detailed logging")
+	fmt.Println("      --dry-run    Show interpolated scripts without executing")
+	fmt.Println("  -V, --version    Print version information")
+	fmt.Println("      --init       Create a default lota.yml in current directory")
+	fmt.Println("      --config     Path to config file or directory")
 }
 
 // PrintGroupHelp displays help for a specific group
@@ -99,8 +158,9 @@ func PrintGroupHelp(group *config.Group) {
 
 	fmt.Println()
 	fmt.Println("Global Options:")
-	fmt.Println("  -h, --help     Print help information")
-	fmt.Println("  -v, --verbose  Enable detailed logging for debugging")
+	fmt.Println("  -h, --help       Print help information")
+	fmt.Println("  -v, --verbose    Enable detailed logging")
+	fmt.Println("      --dry-run    Show interpolated scripts without executing")
 }
 
 func describeArg(arg config.Arg) string {

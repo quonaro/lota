@@ -121,37 +121,3 @@ func TestInterpolate(t *testing.T) {
 		})
 	}
 }
-
-func TestInterpolateSimple(t *testing.T) {
-	tests := []struct {
-		name     string
-		script   string
-		vars     map[string]string
-		args     map[string]string
-		expected string
-	}{
-		{
-			name:     "backward compatibility",
-			script:   "echo {{param1}} {{param2}}",
-			vars:     map[string]string{},
-			args:     map[string]string{"param1": "value1", "param2": "value2"},
-			expected: "echo value1 value2",
-		},
-		{
-			name:     "missing placeholder fallback",
-			script:   "echo {{missing}}",
-			vars:     map[string]string{},
-			args:     map[string]string{},
-			expected: "echo {{missing}}",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := InterpolateSimple(tt.script, tt.vars, tt.args)
-			if result != tt.expected {
-				t.Errorf("InterpolateSimple() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}

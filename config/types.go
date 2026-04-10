@@ -20,7 +20,6 @@ type Group struct {
 	Vars     []Var     `yaml:"vars"`
 	Args     []Arg     `yaml:"-"`
 	RawArgs  []string  `yaml:"args"`
-	Groups   []Group   `yaml:"groups"`
 	Commands []Command
 }
 

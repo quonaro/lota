@@ -11,14 +11,6 @@ type FileConfig struct {
 	Path string
 }
 
-type ConfigReader interface {
-	Read() ([]byte, error)
-}
-
-func (c *FileConfig) Read() ([]byte, error) {
-	return os.ReadFile(c.Path)
-}
-
 func isDir(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {

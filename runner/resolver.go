@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"fmt"
 	"lota/config"
 )
 
@@ -12,13 +11,6 @@ func VarsToEnv(vars map[string]string) []string {
 		rs = append(rs, name+"="+value)
 	}
 	return rs
-}
-
-// ScopedVar represents a variable with its scope information
-type ScopedVar struct {
-	Scope string
-	Path  string
-	Var   config.Var
 }
 
 // ResolveVars merges variables from all scopes for a specific command.
@@ -87,33 +79,3 @@ func ResolveArgs(app config.AppConfig, group *config.Group, command config.Comma
 	return result
 }
 
-// CollectAllVars collects all variables from config for debugging/inspection
-func CollectAllVars(configs []config.AppConfig) []ScopedVar {
-	r := []ScopedVar{}
-
-	for i, app := range configs {
-		appPath := fmt.Sprintf("app[%d]", i)
-		for _, v := range app.Vars {
-			r = append(r, ScopedVar{Scope: "app", Path: appPath, Var: v})
-		}
-
-		for _, group := range app.Groups {
-			for _, v := range group.Vars {
-				r = append(r, ScopedVar{Scope: "group", Path: appPath + "." + group.Name, Var: v})
-			}
-
-			for _, cmd := range group.Commands {
-				for _, v := range cmd.Vars {
-					r = append(r, ScopedVar{Scope: "command", Path: appPath + "." + group.Name + "." + cmd.Name, Var: v})
-				}
-			}
-		}
-
-		for _, cmd := range app.Commands {
-			for _, v := range cmd.Vars {
-				r = append(r, ScopedVar{Scope: "command", Path: appPath + "." + cmd.Name, Var: v})
-			}
-		}
-	}
-	return r
-}

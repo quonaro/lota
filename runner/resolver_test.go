@@ -152,61 +152,6 @@ func TestResolveVars(t *testing.T) {
 	}
 }
 
-func TestCollectAllVars(t *testing.T) {
-	tests := []struct {
-		name     string
-		configs  []config.AppConfig
-		expected []ScopedVar
-	}{
-		{
-			name:     "empty config",
-			configs:  []config.AppConfig{},
-			expected: []ScopedVar{},
-		},
-		{
-			name: "app level vars",
-			configs: []config.AppConfig{
-				{
-					Vars: []config.Var{{Name: "APP_VAR", Value: "value"}},
-				},
-			},
-			expected: []ScopedVar{
-				{Scope: "app", Path: "app[0]", Var: config.Var{Name: "APP_VAR", Value: "value"}},
-			},
-		},
-		{
-			name: "mixed scopes",
-			configs: []config.AppConfig{
-				{
-					Vars: []config.Var{{Name: "GLOBAL", Value: "g"}},
-					Groups: []config.Group{
-						{
-							Name:     "dev",
-							Vars:     []config.Var{{Name: "DEV", Value: "d"}},
-							Commands: []config.Command{{Name: "run", Vars: []config.Var{{Name: "RUN", Value: "r"}}}},
-						},
-					},
-					Commands: []config.Command{{Name: "build", Vars: []config.Var{{Name: "BUILD", Value: "b"}}}},
-				},
-			},
-			expected: []ScopedVar{
-				{Scope: "app", Path: "app[0]", Var: config.Var{Name: "GLOBAL", Value: "g"}},
-				{Scope: "group", Path: "app[0].dev", Var: config.Var{Name: "DEV", Value: "d"}},
-				{Scope: "command", Path: "app[0].dev.run", Var: config.Var{Name: "RUN", Value: "r"}},
-				{Scope: "command", Path: "app[0].build", Var: config.Var{Name: "BUILD", Value: "b"}},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CollectAllVars(tt.configs)
-			if !scopedVarSlicesEqual(result, tt.expected) {
-				t.Errorf("CollectAllVars() = %v, want %v", result, tt.expected)
-			}
-		})
-	}
-}
 
 func TestResolveArgs(t *testing.T) {
 	tests := []struct {
@@ -272,20 +217,6 @@ func TestResolveArgs(t *testing.T) {
 	}
 }
 
-func scopedVarSlicesEqual(a, b []ScopedVar) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	aMap := make(map[string]ScopedVar)
-	bMap := make(map[string]ScopedVar)
-	for _, v := range a {
-		aMap[v.Path+"."+v.Var.Name] = v
-	}
-	for _, v := range b {
-		bMap[v.Path+"."+v.Var.Name] = v
-	}
-	return reflect.DeepEqual(aMap, bMap)
-}
 
 func argsSlicesEqual(a, b []config.Arg) bool {
 	if len(a) != len(b) {
