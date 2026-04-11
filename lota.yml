@@ -1,5 +1,6 @@
 vars:
 - ENV_VAR_1=value1
+- "@import:env .env"
 - ENV_VAR_2=value2
 
 args:

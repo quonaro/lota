@@ -53,8 +53,10 @@ type Arg struct {
 }
 
 type Var struct {
-	Name  string
-	Value string
+	Name     string
+	Value    string
+	FromFile string `yaml:"-"` // path to file to import variables from
+	Format   string `yaml:"-"` // file format: env, json, toml, etc.
 }
 
 type SearchResult struct {

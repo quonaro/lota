@@ -19,6 +19,11 @@ func LoadConfig(configPath string) (*config.AppConfig, error) {
 		return nil, err
 	}
 
+	// Expand all variables from env files (app, groups, commands)
+	if err := config.ExpandAllVars(cfg, fc.Path); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.BuildIndexes(); err != nil {
 		return nil, err
 	}

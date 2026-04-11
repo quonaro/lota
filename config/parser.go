@@ -234,14 +234,26 @@ func (v *Var) UnmarshalYAML(node *yaml.Node) error {
 		return fmt.Errorf("expected scalar node for var, got %d", node.Kind)
 	}
 
+	value := node.Value
+
+	// Format: @import:format <path>
+	if strings.HasPrefix(value, "@import:") {
+		rest := strings.TrimPrefix(value, "@import:")
+		parts := strings.SplitN(rest, " ", 2)
+		if len(parts) == 2 {
+			v.Format = parts[0]
+			v.FromFile = strings.TrimSpace(parts[1])
+			return nil
+		}
+		return fmt.Errorf("invalid import format: %s", value)
+	}
+
 	// Format: name=value
-	parts := strings.SplitN(node.Value, "=", 2)
+	parts := strings.SplitN(value, "=", 2)
 	if len(parts) == 2 {
-		v.Name = parts[0]
-		v.Value = parts[1]
+		v.Name, v.Value = parts[0], parts[1]
 	} else {
-		v.Name = parts[0]
-		v.Value = ""
+		v.Name, v.Value = parts[0], ""
 	}
 
 	return nil
