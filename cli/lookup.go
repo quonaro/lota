@@ -70,6 +70,8 @@ func RunCommand(cfg *config.AppConfig, result config.SearchResult, cliArgs []str
 
 	args := runner.ResolveArgs(*cfg, result.Groups, *result.Command)
 
+	shell := runner.ResolveShell(*cfg, result.Groups, *result.Command)
+
 	parsedArgs, err := runner.ParseArgs(cliArgs, args)
 	if err != nil {
 		return err
@@ -83,5 +85,5 @@ func RunCommand(cfg *config.AppConfig, result config.SearchResult, cliArgs []str
 		ArgDefs: args,
 	}
 
-	return runner.ExecuteCommand(result.Command, context, opts)
+	return runner.ExecuteCommand(result.Command, context, opts, shell)
 }

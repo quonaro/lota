@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.2.0](https://github.com/quonaro/lota/compare/0da49f2123aa3012b305a4ec39df75df0ea23836..v1.2.0) - 2026-04-10
+#### Features
+- add context-aware help for specific commands - ([3bd7d49](https://github.com/quonaro/lota/commit/3bd7d49ec49789eae1bc7c28328c14cb854a69c5)) - quonaro
+#### Refactoring
+- replace ParseCommandPath and FindCommand with greedy ResolveCommand - ([ac86bb2](https://github.com/quonaro/lota/commit/ac86bb2770d6befa64022b76d3c5bde43ad3b4fe)) - quonaro
+#### Miscellaneous Chores
+- update changelog for v1.1.0 - ([0da49f2](https://github.com/quonaro/lota/commit/0da49f2123aa3012b305a4ec39df75df0ea23836)) - quonaro
+
+- - -
+
 ## [v1.1.0](https://github.com/quonaro/lota/compare/0826a66b38d5a796bea1e6081f012e198128ba60..v1.1.0) - 2026-04-10
 #### Features
 - add ASCII art banner and colored output to version command - ([0826a66](https://github.com/quonaro/lota/commit/0826a66b38d5a796bea1e6081f012e198128ba60)) - quonaro

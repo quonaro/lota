@@ -3,6 +3,7 @@ package config
 import "fmt"
 
 type AppConfig struct {
+	Shell    string    `yaml:"shell,omitempty"`
 	Vars     []Var     `yaml:"vars"`
 	Args     []Arg     `yaml:"-"`
 	RawArgs  []string  `yaml:"args"`
@@ -15,11 +16,12 @@ type AppConfig struct {
 }
 
 type Group struct {
+	Shell    string `yaml:"shell,omitempty"`
 	Name     string
-	Desc     string    `yaml:"desc"`
-	Vars     []Var     `yaml:"vars"`
-	Args     []Arg     `yaml:"-"`
-	RawArgs  []string  `yaml:"args"`
+	Desc     string   `yaml:"desc"`
+	Vars     []Var    `yaml:"vars"`
+	Args     []Arg    `yaml:"-"`
+	RawArgs  []string `yaml:"args"`
 	Commands []Command
 	Groups   []Group
 
@@ -29,6 +31,7 @@ type Group struct {
 }
 
 type Command struct {
+	Shell   string `yaml:"shell,omitempty"`
 	Name    string
 	Desc    string   `yaml:"desc"`
 	Vars    []Var    `yaml:"vars"`
@@ -56,8 +59,8 @@ type Var struct {
 
 type SearchResult struct {
 	Exists  bool
-	Command *Command  // non-nil if result is a command
-	Groups  []*Group  // chain of groups from outermost to innermost
+	Command *Command // non-nil if result is a command
+	Groups  []*Group // chain of groups from outermost to innermost
 }
 
 func (c *AppConfig) BuildIndexes() error {

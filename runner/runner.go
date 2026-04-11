@@ -14,15 +14,15 @@ type RunOptions struct {
 }
 
 // executeShell runs a script in shell with environment variables
-func executeShell(script string, env []string) error {
-	cmd := exec.Command("sh", "-c", script)
+func executeShell(script string, env []string, shell string) error {
+	cmd := exec.Command(shell, script)
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunOptions) error {
+func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunOptions, shell string) error {
 	env := VarsToEnv(context.Vars)
 
 	if opts.Verbose {
@@ -49,7 +49,7 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunO
 		if opts.DryRun {
 			fmt.Printf("[dry-run] before:\n%s\n", interpolatedBefore)
 		} else {
-			if err := executeShell(interpolatedBefore, env); err != nil {
+			if err := executeShell(interpolatedBefore, env, shell); err != nil {
 				return fmt.Errorf("before hook failed: %w", err)
 			}
 		}
@@ -70,7 +70,7 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunO
 				fmt.Printf("[dry-run] after:\n%s\n", interpolatedAfter)
 				return
 			}
-			if err := executeShell(interpolatedAfter, env); err != nil {
+			if err := executeShell(interpolatedAfter, env, shell); err != nil {
 				fmt.Printf("after hook failed: %v\n", err)
 			}
 		}
@@ -89,7 +89,7 @@ func ExecuteCommand(cmd *config.Command, context InterpolationContext, opts RunO
 			fmt.Printf("[dry-run] script:\n%s\n", interpolatedScript)
 			return nil
 		}
-		return executeShell(interpolatedScript, env)
+		return executeShell(interpolatedScript, env, shell)
 	}
 
 	return nil

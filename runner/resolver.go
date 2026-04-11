@@ -2,6 +2,7 @@ package runner
 
 import (
 	"lota/config"
+	"runtime"
 )
 
 // VarsToEnv converts a map of variables to environment variable format
@@ -79,3 +80,58 @@ func ResolveArgs(app config.AppConfig, groups []*config.Group, command config.Co
 	return result
 }
 
+func ResolveShell(app config.AppConfig, groups []*config.Group, command config.Command) string {
+	// 1. App level shell (lowest priority)
+	shell := app.Shell
+
+	// 2. Group level shell (outermost to innermost)
+	for _, g := range groups {
+		if g.Shell != "" {
+			shell = g.Shell
+		}
+	}
+
+	// 3. Command level shell (highest priority)
+	if command.Shell != "" {
+		shell = command.Shell
+	}
+
+	if shell == "" {
+		shell = standardShell(nil)
+	}
+
+	return normalizeShell(shell)
+}
+
+func normalizeShell(shell string) string {
+	var r string
+
+	switch shell {
+	case "bash", "sh", "zsh", "dash", "ksh", "mksh", "pdksh", "ash", "busybox", "sash", "tcsh", "csh", "fish":
+		r = "-c"
+	case "powershell.exe", "pwsh", "powershell":
+		r = "-NoProfile -ExecutionPolicy Bypass -Command"
+	case "cmd", "cmd.exe":
+		r = "/c"
+	default:
+		return shell
+	}
+	return shell + " " + r
+}
+
+func standardShell(os *string) string {
+	if os == nil {
+		goos := runtime.GOOS
+		os = &goos
+	}
+
+	ossh := map[string]string{
+		"windows": "powershell.exe",
+		"linux":   "bash",
+		"darwin":  "bash",
+	}
+
+	shell := normalizeShell(ossh[*os])
+
+	return shell
+}
