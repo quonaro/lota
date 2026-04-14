@@ -244,7 +244,7 @@ func TestResolveCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, remain := ResolveCommand(cfg, tt.args)
+			result, remain, _ := ResolveCommand(cfg, tt.args)
 
 			if result.Exists != tt.expectExists {
 				t.Errorf("Exists = %v, want %v", result.Exists, tt.expectExists)

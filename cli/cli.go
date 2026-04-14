@@ -40,7 +40,7 @@ func Run() error {
 	// Check for help flag before ResolveCommand (it skips flags)
 	if hasHelpFlag(remainingArgs) {
 		// Resolve command to show help for it
-		result, _ := ResolveCommand(cfg, remainingArgs)
+		result, _, _ := ResolveCommand(cfg, remainingArgs)
 		if !result.Exists {
 			return fmt.Errorf("command not found: %s", strings.Join(remainingArgs, " "))
 		}
@@ -49,7 +49,7 @@ func Run() error {
 		return nil
 	}
 
-	result, cmdArgs := ResolveCommand(cfg, remainingArgs)
+	result, cmdArgs, _ := ResolveCommand(cfg, remainingArgs)
 	if !result.Exists {
 		return fmt.Errorf("command not found: %s", strings.Join(remainingArgs, " "))
 	}
@@ -66,39 +66,9 @@ func Run() error {
 		return nil
 	}
 
-	// Filter out global flags from command args before parsing
-	cmdArgs = filterGlobalFlags(cmdArgs)
-
 	opts := runner.RunOptions{
 		Verbose: flags.Verbose,
 		DryRun:  flags.DryRun,
 	}
 	return RunCommand(cfg, result, cmdArgs, opts)
-}
-
-// filterGlobalFlags removes global flags from command args
-// Global flags: --help, -h, --verbose, -v, --version, -V, --dry-run, --init, --config
-func filterGlobalFlags(args []string) []string {
-	result := make([]string, 0, len(args))
-	i := 0
-
-	for i < len(args) {
-		arg := args[i]
-
-		// Skip global flags
-		switch arg {
-		case "--help", "-h", "--verbose", "-v", "--version", "-V", "--dry-run", "--init":
-			i++
-			continue
-		case "--config":
-			// Skip --config and its value
-			i += 2
-			continue
-		}
-
-		result = append(result, arg)
-		i++
-	}
-
-	return result
 }
