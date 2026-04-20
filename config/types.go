@@ -56,8 +56,9 @@ type Var struct {
 	Name     string
 	Value    string
 	FromFile string `yaml:"-"` // path to file to import variables from
-	Format   string `yaml:"-"` // file format: env, json, toml, etc.
+	Format   string `yaml:"-"` // file format: env, yaml, json, toml, etc.
 	IsFile   bool   `yaml:"-"` // whether this variable is loaded from a file
+	Prefix   string `yaml:"-"` // prefix for imported variables (e.g., "public" for !import:yaml file.yaml public)
 }
 
 type SearchResult struct {

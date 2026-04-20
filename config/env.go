@@ -8,16 +8,33 @@ import (
 	"strings"
 )
 
-func loadEnvironmentFile(basePath, path, format string) ([]Var, error) {
+func loadEnvironmentFile(basePath, path, format, prefix string) ([]Var, error) {
+	// Handle yaml format with flatten structure
+	if format == "yaml" || format == "yml" {
+		varsMap, err := loadYAMLFile(basePath, path, prefix)
+		if err != nil {
+			return nil, err
+		}
+
+		vars := make([]Var, 0, len(varsMap))
+		for name, value := range varsMap {
+			vars = append(vars, Var{
+				Name:  name,
+				Value: value,
+			})
+		}
+		return vars, nil
+	}
+
+	// For now, only env format is supported besides yaml
+	if format != "" && format != "env" {
+		return nil, fmt.Errorf("unsupported format: %s (only env and yaml are supported)", format)
+	}
+
 	// Resolve path relative to config file
 	fullPath := path
 	if !filepath.IsAbs(path) {
 		fullPath = filepath.Join(filepath.Dir(basePath), path)
-	}
-
-	// For now, only env format is supported
-	if format != "" && format != "env" {
-		return nil, fmt.Errorf("unsupported format: %s (only env is supported)", format)
 	}
 
 	file, err := os.Open(fullPath)
@@ -63,7 +80,7 @@ func ExpandVarsFromFile(vars []Var, basePath string) ([]Var, error) {
 	for _, v := range vars {
 		if v.FromFile != "" {
 			// Load variables from file
-			fileVars, err := loadEnvironmentFile(basePath, v.FromFile, v.Format)
+			fileVars, err := loadEnvironmentFile(basePath, v.FromFile, v.Format, v.Prefix)
 			if err != nil {
 				return nil, err
 			}

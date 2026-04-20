@@ -2,10 +2,10 @@ vars:
 - ENV_VAR_1=value1
 - !import:env .env
 - ENV_VAR_2=value2
+- !import:yaml env.yml@public app_name
 
-args:
-- environment|env:str="dev"
-- verbose|v:bool=false
+helpwor:
+  script: echo {{app_name.app_name}}
 
 group1:
   desc: Test group 1 description
@@ -80,3 +80,12 @@ hello-world:
   - name|n:str
   script: |
     echo Hello {{name}}
+
+test-import:
+  desc: Test YAML import
+  vars:
+  - !import:yaml env.yml app
+  script: |
+    echo "app_name={{app.public.app_name}}"
+    echo "version={{app.public.version}}"
+    echo "debug={{app.public.debug}}"

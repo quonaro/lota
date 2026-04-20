@@ -237,11 +237,21 @@ func (v *Var) UnmarshalYAML(node *yaml.Node) error {
 	tag := node.Tag
 	value := node.Value
 
-	// Format: !import:format <path>
+	// Format: !import:format <path> [prefix]
 	if strings.HasPrefix(tag, "!import:") {
 		v.IsFile = true
 		v.Format = strings.TrimPrefix(tag, "!import:")
-		v.FromFile = strings.TrimSpace(value)
+
+		// Parse: path [prefix]
+		fields := strings.Fields(strings.TrimSpace(value))
+		if len(fields) == 0 {
+			return fmt.Errorf("import requires a file path")
+		}
+
+		v.FromFile = fields[0]
+		if len(fields) > 1 {
+			v.Prefix = fields[1]
+		}
 		return nil
 	}
 
