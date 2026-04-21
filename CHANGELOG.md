@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.5.0](https://github.com/quonaro/lota/compare/fd263bf15328a8f47767ade734f6b756da0b6ab0..v1.5.0) - 2026-04-21
+#### Features
+- add installation script with checksums verification and interactive setup - ([f554fde](https://github.com/quonaro/lota/commit/f554fde028f8420501a6c09b89a65223ac41b142)) - quonaro
+#### Miscellaneous Chores
+- update changelog for v1.4.0 - ([fd263bf](https://github.com/quonaro/lota/commit/fd263bf15328a8f47767ade734f6b756da0b6ab0)) - quonaro
+
+- - -
+
 ## [v1.4.0](https://github.com/quonaro/lota/compare/436e1518859eccd8b765e82e308cb0a699865443..v1.4.0) - 2026-04-20
 #### Features
 - add YAML file import support with prefix and section selection - ([43af8d7](https://github.com/quonaro/lota/commit/43af8d787434480cfd3830d429ebb035dd1f4e2c)) - quonaro
