@@ -32,7 +32,10 @@ jobs:
       - name: Calculate next version
         id: version
         run: |
-          NEW_TAG=$(cog bump --auto --dry-run)
+          if ! NEW_TAG=$(cog bump --auto --dry-run); then
+            echo "::error::No feat/fix/breaking commits found since last tag. Merge feature branches into main before releasing."
+            exit 1
+          fi
           echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "Next version: ${NEW_TAG}"
 
