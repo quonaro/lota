@@ -2,6 +2,16 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## [v1.7.0](https://github.com/quonaro/lota/compare/611cf93647a5a3a16a2342eb3eecce4ea5300ebe..v1.7.0) - 2026-04-21
+#### Features
+- add pre-commit hooks and improve code quality tooling - ([3e48459](https://github.com/quonaro/lota/commit/3e48459f0f84f62a6c47a65848f684bb92df4c02)) - quonaro
+#### Bug Fixes
+- install.sh to match build.sh artifact naming - ([611cf93](https://github.com/quonaro/lota/commit/611cf93647a5a3a16a2342eb3eecce4ea5300ebe)) - quonaro
+#### Miscellaneous Chores
+- add workflow_dispatch trigger to CI workflow - ([95c8554](https://github.com/quonaro/lota/commit/95c8554ee9f23c87acad71fab18677e2a6c1cf80)) - quonaro
+
+- - -
+
 ## [v1.6.3](https://github.com/quonaro/lota/compare/611cf93647a5a3a16a2342eb3eecce4ea5300ebe..v1.6.3) - 2026-04-21
 #### Bug Fixes
 - install.sh to match build.sh artifact naming - ([611cf93](https://github.com/quonaro/lota/commit/611cf93647a5a3a16a2342eb3eecce4ea5300ebe)) - quonaro
