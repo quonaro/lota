@@ -1,33 +1,94 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-release:
+  release:
     runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.version.outputs.NEW_TAG }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
-      - name: Build
-        env:
-          VERSION: ${{ github.ref_name }}
+          cache: true
+
+      - name: Install cog
+        uses: cocogitto/cocogitto-action@v3
+        with:
+          check: false
+
+      - name: Calculate next version
+        id: version
         run: |
-          chmod +x ./scripts/build.sh
-          ./scripts/build.sh
+          NEW_TAG=$(cog bump --auto --dry-run)
+          echo "NEW_TAG=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "Next version: ${NEW_TAG}"
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.NEW_TAG }} -m "Release ${{ steps.version.outputs.NEW_TAG }}"
+          git push origin ${{ steps.version.outputs.NEW_TAG }}
+
+      - name: Build binary
+        env:
+          NEW_TAG: ${{ steps.version.outputs.NEW_TAG }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          mkdir -p dist
+          go build -ldflags "-X lota/shared.Version=${NEW_TAG} -X lota/shared.Commit=${COMMIT} -X lota/shared.BuildTime=${BUILD_TIME}" -o dist/lota
+          chmod +x dist/lota
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: dist/lota
+          tag_name: ${{ steps.version.outputs.NEW_TAG }}
+          name: Release ${{ steps.version.outputs.NEW_TAG }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  aur_sync:
+    needs: release
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm git openssh base-devel
+
+      - uses: actions/checkout@v6
+
+      - name: Setup AUR SSH key
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "${AUR_SSH_PRIVATE_KEY}" ]; then
+            echo "AUR_SSH_PRIVATE_KEY is missing!" && exit 1
+          fi
+          mkdir -p ~/.ssh
+          echo "${AUR_SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+
+      - name: Update AUR
+        env:
+          VERSION: ${{ needs.release.outputs.new_tag }}
+        run: |
+          chmod +x ./scripts/update-aur.sh
+          ./scripts/update-aur.sh "${VERSION}"

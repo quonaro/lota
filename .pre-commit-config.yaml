@@ -44,3 +44,12 @@ repos:
     language: system
     pass_filenames: false
     description: Run golangci-lint
+
+- repo: local
+  hooks:
+  - id: cog-check
+    name: cog check
+    entry: cog check --check-armored
+    language: system
+    stages: [ commit-msg ]
+    description: Check commit message with Conventional Commits
