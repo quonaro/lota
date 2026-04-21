@@ -28,9 +28,10 @@ jobs:
         go-version-file: 'go.mod'
         cache: true # Автоматическое кэширование зависимостей
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v9
       with:
         version: latest
+        install-mode: goinstall
         args: --timeout=5m
 
   test:
