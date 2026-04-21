@@ -24,9 +24,13 @@ fi
 cd "${AUR_DIR}"
 
 sed -E -i "s/^pkgver=.*/pkgver=${PKGVER}/" PKGBUILD
+sed -E -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 
 rm -rf lota/ src/ pkg/
 makepkg --printsrcinfo > .SRCINFO
+
+git config user.name "github-actions[bot]"
+git config user.email "github-actions[bot]@users.noreply.github.com"
 
 git add PKGBUILD .SRCINFO
 
