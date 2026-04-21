@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.COCOGITTO_TOKEN }}
 
       - name: Auto bump tag
         id: bump
@@ -27,6 +28,8 @@ jobs:
           release: true
           git-user: github-actions[bot]
           git-user-email: github-actions[bot]@users.noreply.github.com
+        env:
+          GITHUB_TOKEN: ${{ secrets.COCOGITTO_TOKEN }}
 
       - name: No release needed
         if: ${{ steps.bump.outputs.version == '' }}
