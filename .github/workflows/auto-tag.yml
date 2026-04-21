@@ -1,4 +1,4 @@
-name: Lota Auto Tag
+name: Lota Set Version
 
 on:
   workflow_run:
@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 jobs:
-  auto_tag:
+  auto_set_version:
     if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
     steps:
@@ -41,11 +41,27 @@ jobs:
           git-user: github-actions[bot]
           git-user-email: github-actions[bot]@users.noreply.github.com
 
+      - name: Sync Version constant for auto release
+        if: ${{ steps.bump.outputs.version != '' }}
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          sed -E -i 's|^var Version = "[^"]*"$|var Version = "'"${VERSION}"'"|' shared/constants.go
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shared/constants.go
+          if git diff --cached --quiet; then
+            echo "shared/constants.go is already up to date"
+          else
+            git commit -m "chore(version): sync shared version to ${VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: No release needed
         if: ${{ steps.bump.outputs.version == '' }}
         run: echo "No conventional commits requiring a new release tag"
 
-  manual_tag:
+  manual_set_version:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
@@ -63,10 +79,23 @@ jobs:
             VERSION="v${VERSION}"
           fi
 
+          PLAIN_VERSION="${VERSION#v}"
+
           if git rev-parse -q --verify "refs/tags/${VERSION}" >/dev/null; then
             echo "Tag ${VERSION} already exists"
             exit 1
           fi
 
-          git tag "${VERSION}" main
+          sed -E -i 's|^var Version = "[^"]*"$|var Version = "'"${PLAIN_VERSION}"'"|' shared/constants.go
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add shared/constants.go
+          if git diff --cached --quiet; then
+            echo "shared/constants.go is already up to date"
+          else
+            git commit -m "chore(version): sync shared version to ${PLAIN_VERSION} [skip ci]"
+            git push origin HEAD:main
+          fi
+
+          git tag "${VERSION}" HEAD
           git push origin "${VERSION}"
