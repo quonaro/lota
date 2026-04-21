@@ -29,11 +29,11 @@ sed -E -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 rm -rf lota/ src/ pkg/
 
 if [ "$(id -u)" = "0" ]; then
-  useradd -M -s /bin/bash _build 2>/dev/null || true
+  useradd -m -s /bin/bash _build 2>/dev/null || true
   tmpdir=$(mktemp -d)
   cp PKGBUILD "${tmpdir}/"
   chown -R _build:_build "${tmpdir}"
-  su _build -s /bin/bash -c "cd '${tmpdir}' && makepkg --printsrcinfo" > .SRCINFO
+  runuser -u _build -- bash -c "cd '${tmpdir}' && makepkg --printsrcinfo" > .SRCINFO
   rm -rf "${tmpdir}"
 else
   makepkg --printsrcinfo > .SRCINFO
