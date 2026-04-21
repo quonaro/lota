@@ -29,10 +29,17 @@ sed -E -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
 rm -rf lota/ src/ pkg/
 
 if [ "$(id -u)" = "0" ]; then
-  useradd -M -s /bin/sh _build 2>/dev/null || true
-  su _build -s /bin/sh -c "cd $(pwd) && makepkg --printsrcinfo" > .SRCINFO
+  useradd -M -s /bin/bash _build 2>/dev/null || true
+  chown -R _build:_build .
+  su _build -s /bin/bash -c "cd '$(pwd)' && makepkg --printsrcinfo" > .SRCINFO
+  chown -R root:root .
 else
   makepkg --printsrcinfo > .SRCINFO
+fi
+
+if [ ! -s .SRCINFO ]; then
+  echo "ERROR: .SRCINFO is empty, makepkg --printsrcinfo failed" >&2
+  exit 1
 fi
 
 git config user.name "github-actions[bot]"
