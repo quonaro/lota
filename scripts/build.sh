@@ -15,17 +15,11 @@ TARGETS=(
 )
 
 VERSION=${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo "dev")}
-COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-LDFLAGS="-s -w"
-LDFLAGS+=" -X ${MODULE}/shared.Version=${VERSION}"
-LDFLAGS+=" -X ${MODULE}/shared.Commit=${COMMIT}"
-LDFLAGS+=" -X ${MODULE}/shared.BuildDate=${BUILD_DATE}"
+LDFLAGS="-s -w -X ${MODULE}/shared.Version=${VERSION}"
 
 mkdir -p "${OUTPUT_DIR}"
 
-echo "Building ${BINARY} ${VERSION} (${COMMIT})"
+echo "Building ${BINARY} ${VERSION}"
 echo "-------------------------------------------"
 
 for target in "${TARGETS[@]}"; do

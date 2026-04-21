@@ -16,7 +16,8 @@ pre_bump_hooks = [
 
 post_bump_hooks = [
   "git push",
-  "git push origin v{{version}}"
+  "git push origin v{{version}}",
+  "bash scripts/update-aur.sh"
 ]
 
 [git_hooks.commit-msg]
