@@ -61,7 +61,7 @@ jobs:
     - name: Generate checksums for all artifacts
       run: |
         cd dist
-        sha256sum *.tar.gz lota-* > checksums.txt
+        sha256sum * > checksums.txt
         cat checksums.txt
 
     - name: Create Release
