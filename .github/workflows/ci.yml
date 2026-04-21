@@ -1,4 +1,4 @@
-name: CI
+name: Lota CI & Release
 
 on:
   push:
