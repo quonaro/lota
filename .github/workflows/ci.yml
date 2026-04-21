@@ -2,7 +2,8 @@ name: Lota CI & Release
 
 on:
   push:
-    branches: [ main ]
+    # Запускаем тесты в любой ветке для мгновенного фидбека
+    branches: [ "**" ]
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   pull_request:
@@ -13,7 +14,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Группируем по ветке: новый пуш отменяет старую проверку в этой же ветке
+  group: ${{ github.workflow  }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -24,8 +26,13 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
-    - name: go vet
-      run: go vet ./...
+        cache: true # Автоматическое кэширование зависимостей
+    - name: golangci-lint
+      uses: golangci/golangci-lint-action@v9
+      with:
+        version: latest
+        install-mode: goinstall
+        args: --timeout=5m
 
   test:
     runs-on: ubuntu-latest
@@ -34,12 +41,10 @@ jobs:
     - uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
-    - name: Download dependencies
-      run: go mod download
-    - name: Verify modules
-      run: go mod verify
+        cache: true
     - name: Run tests
-      run: go test -race ./...
+      # -race обязателен для Go, -v для детального лога при падении
+      run: go test -v -race ./...
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -47,13 +52,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0 # Нужно для корректной генерации логов релиза
     - uses: actions/setup-go@v6
       with:
         go-version-file: 'go.mod'
-    - name: Build release binaries
+    - name: Build
       env:
         VERSION: ${{ github.ref_name }}
-      run: ./scripts/build.sh
+      run: |
+        chmod +x ./scripts/build.sh
+        ./scripts/build.sh
     - name: Create Release
       uses: softprops/action-gh-release@v2
       with:
@@ -66,10 +75,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: [ release ]
     runs-on: ubuntu-latest
+    # Использование контейнера оправдано для pacman, но убедись, что скрипт внутри него сработает
     container:
       image: archlinux:latest
     steps:
-    - name: Install AUR sync dependencies
+    - name: Install dependencies
       run: pacman -Syu --noconfirm git openssh base-devel
     - uses: actions/checkout@v6
     - name: Setup AUR SSH key
@@ -77,14 +87,15 @@ jobs:
         AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
       run: |
         if [ -z "${AUR_SSH_PRIVATE_KEY}" ]; then
-          echo "AUR_SSH_PRIVATE_KEY secret is not configured"
-          exit 1
+          echo "AUR_SSH_PRIVATE_KEY is missing!" && exit 1
         fi
-        install -m 700 -d ~/.ssh
-        printf '%s\n' "${AUR_SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+        mkdir -p ~/.ssh
+        echo "${AUR_SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
-        ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-    - name: Update AUR package
+        ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+    - name: Update AUR
       env:
         VERSION: ${{ github.ref_name }}
-      run: ./scripts/update-aur.sh "${VERSION}"
+      run: |
+        chmod +x ./scripts/update-aur.sh
+        ./scripts/update-aur.sh "${VERSION}"
