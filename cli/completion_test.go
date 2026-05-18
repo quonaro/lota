@@ -207,7 +207,7 @@ func TestPrintCompletionScript(t *testing.T) {
 		},
 		{
 			shell:    "zsh",
-			contains: []string{"lota __complete"},
+			contains: []string{"lota __complete", "__hint__:", "compadd -x"},
 			excludes: []string{"export COMP_LINE", "export COMP_POINT", "env COMP_LINE", "env COMP_POINT"},
 		},
 		{
@@ -566,6 +566,92 @@ func TestExtractCompletionArgs_PathToken(t *testing.T) {
 	args := extractCompletionArgs(parsed, "lota")
 	if len(args) != 1 || args[0].Text != "group1" {
 		t.Fatalf("unexpected extracted args for path token: %+v", args)
+	}
+}
+
+func TestPositionalCompletionHint_ExpectedPositional(t *testing.T) {
+	cfg := &config.AppConfig{
+		Groups: []config.Group{
+			{
+				Name: "group2",
+				Commands: []config.Command{
+					{
+						Name: "command5",
+						Args: []config.Arg{
+							{Name: "service", Type: "str"},
+							{Name: "cmd", Wildcard: true},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := cfg.BuildIndexes(); err != nil {
+		t.Fatalf("build indexes: %v", err)
+	}
+
+	parsed := complete.ParseArgs("lota group2 command5 ")
+	args := extractCompletionArgs(parsed, "lota")
+
+	hint := positionalCompletionHint(cfg, args)
+	want := "expected positional arg: <SERVICE_ARG>"
+	if hint != want {
+		t.Fatalf("unexpected hint: got %q, want %q", hint, want)
+	}
+}
+
+func TestPositionalCompletionHint_NoHintAfterPositionalProvided(t *testing.T) {
+	cfg := &config.AppConfig{
+		Groups: []config.Group{
+			{
+				Name: "group2",
+				Commands: []config.Command{
+					{
+						Name: "command5",
+						Args: []config.Arg{
+							{Name: "service", Type: "str"},
+							{Name: "cmd", Wildcard: true},
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := cfg.BuildIndexes(); err != nil {
+		t.Fatalf("build indexes: %v", err)
+	}
+
+	parsed := complete.ParseArgs("lota group2 command5 backend ")
+	args := extractCompletionArgs(parsed, "lota")
+
+	hint := positionalCompletionHint(cfg, args)
+	if hint != "" {
+		t.Fatalf("expected no hint after positional value, got %q", hint)
+	}
+}
+
+func TestPositionalCompletionHint_NoHintWhileTypingFlag(t *testing.T) {
+	cfg := &config.AppConfig{
+		Commands: []config.Command{
+			{
+				Name: "run",
+				Args: []config.Arg{
+					{Name: "verbose", Type: "bool"},
+					{Name: "service", Type: "str"},
+				},
+			},
+		},
+	}
+	if err := cfg.BuildIndexes(); err != nil {
+		t.Fatalf("build indexes: %v", err)
+	}
+
+	parsed := complete.ParseArgs("lota run -")
+	args := extractCompletionArgs(parsed, "lota")
+
+	hint := positionalCompletionHint(cfg, args)
+	if hint != "" {
+		t.Fatalf("expected no hint while typing flag token, got %q", hint)
 	}
 }
 

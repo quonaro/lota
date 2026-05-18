@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"lota/config"
+	"lota/runner"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +14,8 @@ import (
 
 	icomp "lota/cli/internal/complete"
 )
+
+const completionHintPrefix = "__hint__:"
 
 // RunCompleteSubcommand runs shell completion from explicit positional arguments.
 // args[0] is the full command line; args[1] is the cursor position.
@@ -49,6 +52,9 @@ func RunCompleteSubcommand(args []string) {
 	for _, option := range options {
 		fmt.Println(option)
 	}
+	if hint := positionalCompletionHint(cfg, parsedArgs); hint != "" {
+		fmt.Println(completionHintPrefix + hint)
+	}
 	os.Exit(0)
 }
 
@@ -72,6 +78,142 @@ func extractCompletionArgs(parsedArgs []icomp.Arg, commandName string) []icomp.A
 
 	// Fallback to previous behavior: assume first token is command.
 	return parsedArgs[1:]
+}
+
+func positionalCompletionHint(cfg *config.AppConfig, parsedArgs []icomp.Arg) string {
+	if len(parsedArgs) == 0 {
+		return ""
+	}
+
+	tokens := make([]string, 0, len(parsedArgs))
+	for _, arg := range parsedArgs {
+		tokens = append(tokens, arg.Text)
+	}
+
+	result, _, lastFound := ResolveCommand(cfg, tokens)
+	if !result.Exists || result.Command == nil {
+		return ""
+	}
+
+	cmdArgStart := lastFound + 1
+	if cmdArgStart < 0 || cmdArgStart > len(parsedArgs) {
+		return ""
+	}
+
+	argDefs := runner.ResolveArgs(*cfg, result.Groups, *result.Command)
+	return nextPositionalHint(parsedArgs[cmdArgStart:], argDefs)
+}
+
+func nextPositionalHint(cmdArgs []icomp.Arg, argDefs []config.Arg) string {
+	flagDefs := make(map[string]*config.Arg)
+	positionals := make([]config.Arg, 0)
+	hasWildcard := false
+
+	for i := range argDefs {
+		argDef := &argDefs[i]
+		if argDef.Wildcard {
+			hasWildcard = true
+			continue
+		}
+		if isFlagArgForCompletion(*argDef) {
+			if argDef.Name != "" {
+				flagDefs["--"+argDef.Name] = argDef
+			}
+			if argDef.Short != "" {
+				flagDefs["-"+argDef.Short] = argDef
+			}
+			continue
+		}
+		positionals = append(positionals, *argDef)
+	}
+
+	if len(positionals) == 0 {
+		return ""
+	}
+
+	positionalIndex := 0
+	valueOnlyMode := false
+
+	for i := 0; i < len(cmdArgs); i++ {
+		token := cmdArgs[i].Text
+
+		if valueOnlyMode {
+			if positionalIndex < len(positionals) {
+				positionalIndex++
+			} else if !hasWildcard {
+				return ""
+			}
+			continue
+		}
+
+		if token == "--" {
+			valueOnlyMode = true
+			continue
+		}
+
+		if strings.HasPrefix(token, "-") && len(token) > 1 {
+			flagToken := token
+			hasInlineValue := false
+			if strings.Contains(flagToken, "=") {
+				parts := strings.SplitN(flagToken, "=", 2)
+				flagToken = parts[0]
+				hasInlineValue = true
+			}
+
+			flagDef, ok := flagDefs[flagToken]
+			if !ok && !hasInlineValue && strings.HasPrefix(flagToken, "--!") {
+				negated := "--" + strings.TrimPrefix(flagToken, "--!")
+				flagDef, ok = flagDefs[negated]
+			}
+			if !ok {
+				return ""
+			}
+
+			if flagDef.Type != "bool" && !hasInlineValue {
+				if i+1 >= len(cmdArgs) {
+					return ""
+				}
+				i++
+			}
+			continue
+		}
+
+		if positionalIndex < len(positionals) {
+			positionalIndex++
+			continue
+		}
+		if !hasWildcard {
+			return ""
+		}
+	}
+
+	if positionalIndex >= len(positionals) {
+		return ""
+	}
+
+	return "expected positional arg: " + positionalPlaceholder(positionals[positionalIndex].Name)
+}
+
+func positionalPlaceholder(name string) string {
+	upper := strings.ToUpper(name)
+	b := strings.Builder{}
+	b.Grow(len(upper) + len("_ARG"))
+	for i := 0; i < len(upper); i++ {
+		ch := upper[i]
+		if (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+			b.WriteByte(ch)
+			continue
+		}
+		b.WriteByte('_')
+	}
+	value := strings.Trim(b.String(), "_")
+	if value == "" {
+		value = "ARG"
+	}
+	if !strings.HasSuffix(value, "_ARG") {
+		value += "_ARG"
+	}
+	return "<" + value + ">"
 }
 
 // BuildCompletion creates a completion tree from the app configuration.
@@ -181,21 +323,55 @@ var completionScripts = map[string]string{
 	"bash": `_lota_complete() {
     local line="${COMP_LINE}"
     local point="${COMP_POINT}"
-    COMPREPLY=( $(lota __complete "$line" "$point") )
+    local -a raw
+    local -a filtered
+    mapfile -t raw < <(lota __complete "$line" "$point")
+    filtered=()
+    for item in "${raw[@]}"; do
+        if [[ "$item" == __hint__:* ]]; then
+            continue
+        fi
+        filtered+=("$item")
+    done
+    COMPREPLY=("${filtered[@]}")
 }
 complete -F _lota_complete lota
 `,
 	"zsh": `#compdef lota
 function _lota {
     local line="${LBUFFER}${RBUFFER}"
+    local -a raw
     local -a completions
-    completions=(${(f)"$(lota __complete "$line" "${#LBUFFER}")"})
-    compadd -Q -V lota -a completions
+    local -a hints
+    raw=(${(f)"$(lota __complete "$line" "${#LBUFFER}")"})
+    completions=()
+    hints=()
+
+    local item
+    for item in "${raw[@]}"; do
+        if [[ "$item" == __hint__:* ]]; then
+            hints+=("${item#__hint__:}")
+            continue
+        fi
+        completions+=("$item")
+    done
+
+    if (( ${#hints[@]} > 0 )); then
+        compadd -x "${(j:; :)hints}"
+    fi
+    if (( ${#completions[@]} > 0 )); then
+        compadd -Q -V lota -a completions
+    fi
 }
 compdef _lota lota
 `,
 	"fish": `function __lota_complete
-    lota __complete (commandline) (commandline -C)
+    for item in (lota __complete (commandline) (commandline -C))
+        if string match -q "__hint__:*" -- $item
+            continue
+        end
+        echo $item
+    end
 end
 complete -c lota -f -a "(__lota_complete)"
 `,
