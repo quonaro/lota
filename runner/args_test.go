@@ -126,6 +126,16 @@ func TestParseArgs(t *testing.T) {
 			},
 		},
 		{
+			name:    "positional arg with default overridden",
+			cliArgs: []string{"prod"},
+			argDefs: []config.Arg{
+				{Name: "env", Type: "str", Default: "dev"},
+			},
+			expected: map[string]string{
+				"env": "prod",
+			},
+		},
+		{
 			name:    "-- separator passes flags to wildcard",
 			cliArgs: []string{"myservice", "--", "--docker-flag", "--another"},
 			argDefs: []config.Arg{

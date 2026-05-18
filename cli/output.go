@@ -20,7 +20,7 @@ vars:
 
 hello:
   desc: Print a greeting
-  script: echo "Hello, {{PROJECT}}!"
+  script: echo "Hello, $PROJECT!"
 `
 
 // PrintError prints a formatted error message to stderr
@@ -57,7 +57,9 @@ func printGlobalOptions() {
 func PrintHelp(configPath string) {
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		color.Red("Error loading config: %v\n\n", err)
+		fmt.Println("No lota.yml found in current directory or parent directories.")
+		fmt.Println("Run `lota --init` to create a default configuration.")
+		fmt.Println()
 		printGlobalOptions()
 		return
 	}
@@ -299,20 +301,16 @@ func separateArgs(args []config.Arg) (positionalArgs, flagArgs []config.Arg) {
 
 // isFlagArg determines if an argument is a flag (non-positional)
 func isFlagArg(arg config.Arg) bool {
+	// Wildcard arguments are always positional
+	if arg.Wildcard {
+		return false
+	}
 	// Has short form (e.g., -p)
 	if arg.Short != "" {
 		return true
 	}
 	// Boolean flag
 	if arg.Type == "bool" {
-		return true
-	}
-	// Has default value (can be used as flag)
-	if arg.Default != "" {
-		return true
-	}
-	// Wildcard argument (captures remaining args)
-	if arg.Wildcard {
 		return true
 	}
 	return false
