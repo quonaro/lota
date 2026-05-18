@@ -76,7 +76,7 @@ func Interpolate(script string, context InterpolationContext) (string, error) {
 		}
 		if _, isArg := context.Args[placeholder]; isArg {
 			if !deprecationWarned[placeholder] {
-				fmt.Fprintf(os.Stderr, "warning: {{%s}} interpolation is deprecated, use $%s instead\n", placeholder, placeholder)
+				fmt.Fprintf(os.Stderr, "\033[33mwarning: {{%s}} interpolation is deprecated, use $%s instead\033[0m\n", placeholder, placeholder)
 				deprecationWarned[placeholder] = true
 			}
 		}

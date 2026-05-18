@@ -50,6 +50,7 @@ func printGlobalOptions() {
 	fmt.Printf("  %-20s %s\n", "-U, --update", "Update lota to the latest version")
 	fmt.Printf("  %-20s %s\n", "--init", "Create a default lota.yml in current directory")
 	fmt.Printf("  %-20s %s\n", "--config", "Path to config file or directory")
+	fmt.Printf("  %-20s %s\n", "--install-completion [SHELL]", "Install shell completion (auto-detects if no shell given)")
 }
 
 // PrintHelp displays available commands

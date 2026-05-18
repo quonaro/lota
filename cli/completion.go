@@ -6,18 +6,30 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/posener/complete/v2"
 	"github.com/posener/complete/v2/predict"
+
+	icomp "lota/cli/internal/complete"
 )
 
-// RunCompletion runs shell completion based on COMP_LINE and COMP_POINT env vars.
-func RunCompletion() {
-	// posener/complete requires COMP_POINT; default to end of line if missing
-	if os.Getenv("COMP_POINT") == "" {
-		if line := os.Getenv("COMP_LINE"); line != "" {
-			_ = os.Setenv("COMP_POINT", strconv.Itoa(len(line)))
-		}
+// RunCompleteSubcommand runs shell completion from explicit positional arguments.
+// args[0] is the full command line; args[1] is the cursor position.
+func RunCompleteSubcommand(args []string) {
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: lota __complete <line> <point>")
+		os.Exit(1)
+	}
+
+	line := args[0]
+	point, err := strconv.Atoi(args[1])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid point: %v\n", err)
+		os.Exit(1)
+	}
+	if point > len(line) {
+		point = len(line)
 	}
 
 	cfg, err := LoadConfig("")
@@ -26,7 +38,40 @@ func RunCompletion() {
 	}
 
 	comp := BuildCompletion(cfg)
-	comp.Complete("lota")
+
+	parsedArgs := icomp.ParseArgs(line[:point])
+	parsedArgs = extractCompletionArgs(parsedArgs, filepath.Base(os.Args[0]))
+
+	options, err := icomp.Run(comp, parsedArgs)
+	if err != nil {
+		os.Exit(0)
+	}
+	for _, option := range options {
+		fmt.Println(option)
+	}
+	os.Exit(0)
+}
+
+func extractCompletionArgs(parsedArgs []icomp.Arg, commandName string) []icomp.Arg {
+	if len(parsedArgs) == 0 {
+		return nil
+	}
+
+	idx := -1
+	for i := len(parsedArgs) - 1; i >= 0; i-- {
+		token := parsedArgs[i].Text
+		if token == commandName || filepath.Base(token) == commandName {
+			idx = i
+			break
+		}
+	}
+
+	if idx >= 0 {
+		return parsedArgs[idx+1:]
+	}
+
+	// Fallback to previous behavior: assume first token is command.
+	return parsedArgs[1:]
 }
 
 // BuildCompletion creates a completion tree from the app configuration.
@@ -60,7 +105,9 @@ func buildGroupCompletion(g *config.Group) *complete.Command {
 
 	// Group-level args as flags
 	for _, arg := range g.Args {
-		addArgFlag(sub, arg)
+		if isFlagArgForCompletion(arg) {
+			addArgFlag(sub, arg)
+		}
 	}
 
 	for i := range g.Groups {
@@ -82,7 +129,9 @@ func buildCommandCompletion(c *config.Command) *complete.Command {
 
 	// Command-level args as flags
 	for _, arg := range c.Args {
-		addArgFlag(cmd, arg)
+		if isFlagArgForCompletion(arg) {
+			addArgFlag(cmd, arg)
+		}
 	}
 
 	// Positional args: allow anything (files, etc.)
@@ -92,22 +141,30 @@ func buildCommandCompletion(c *config.Command) *complete.Command {
 }
 
 func addGlobalFlags(cmd *complete.Command) {
-	cmd.Flags["-h"] = predict.Nothing
-	cmd.Flags["--help"] = predict.Nothing
-	cmd.Flags["-v"] = predict.Nothing
-	cmd.Flags["--verbose"] = predict.Nothing
-	cmd.Flags["-V"] = predict.Nothing
-	cmd.Flags["--version"] = predict.Nothing
-	cmd.Flags["--dry-run"] = predict.Nothing
-	cmd.Flags["--init"] = predict.Nothing
-	cmd.Flags["--config"] = predict.Files("*")
+	cmd.Flags["v"] = predict.Nothing
+	cmd.Flags["verbose"] = predict.Nothing
+	cmd.Flags["V"] = predict.Nothing
+	cmd.Flags["version"] = predict.Nothing
+	cmd.Flags["dry-run"] = predict.Nothing
+	cmd.Flags["init"] = predict.Nothing
+	cmd.Flags["config"] = predict.Files("*")
+	cmd.Flags["completion-script"] = predict.Nothing
+	cmd.Flags["install-completion"] = predict.Nothing
+	cmd.Flags["timeout"] = predict.Nothing
 }
 
 func addArgFlag(cmd *complete.Command, arg config.Arg) {
 	if arg.Short != "" {
-		cmd.Flags["-"+arg.Short] = predict.Nothing
+		cmd.Flags[arg.Short] = predict.Nothing
 	}
-	cmd.Flags["--"+arg.Name] = predict.Nothing
+	cmd.Flags[arg.Name] = predict.Nothing
+}
+
+func isFlagArgForCompletion(arg config.Arg) bool {
+	if arg.Wildcard {
+		return false
+	}
+	return arg.Short != "" || arg.Type == "bool" || arg.Default != ""
 }
 
 // anythingPredictor predicts nothing, allowing shell default completion.
@@ -121,17 +178,26 @@ var predictAnything complete.Predictor = anythingPredictor{}
 
 // completionScripts maps shell names to their completion scripts.
 var completionScripts = map[string]string{
-	"bash": "complete -C 'lota __complete' lota\n",
+	"bash": `_lota_complete() {
+    local line="${COMP_LINE}"
+    local point="${COMP_POINT}"
+    COMPREPLY=( $(lota __complete "$line" "$point") )
+}
+complete -F _lota_complete lota
+`,
 	"zsh": `#compdef lota
 function _lota {
     local line="${LBUFFER}${RBUFFER}"
     local -a completions
-    completions=($(env COMP_LINE="$line" COMP_POINT=${#LBUFFER} lota __complete))
-    compadd -a completions
+    completions=(${(f)"$(lota __complete "$line" "${#LBUFFER}")"})
+    compadd -Q -V lota -a completions
 }
 compdef _lota lota
 `,
-	"fish": `complete -c lota -f -a "(env COMP_LINE=(commandline) COMP_POINT=(commandline -C) lota __complete)"
+	"fish": `function __lota_complete
+    lota __complete (commandline) (commandline -C)
+end
+complete -c lota -f -a "(__lota_complete)"
 `,
 }
 
@@ -209,5 +275,58 @@ func InstallCompletionScript(shell string) error {
 	}
 
 	fmt.Printf("Installed %s completion to %s\n", shell, path)
+
+	if shell == "zsh" {
+		if err := ensureZshFpath(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// ensureZshFpath checks if ~/.config/zsh/completions is in fpath in ~/.zshrc,
+// and appends it before compinit if missing.
+func ensureZshFpath() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("unable to determine home directory: %w", err)
+	}
+
+	zshrc := filepath.Join(home, ".zshrc")
+	data, err := os.ReadFile(zshrc)
+	if err != nil {
+		return fmt.Errorf("could not read %s: %w", zshrc, err)
+	}
+
+	content := string(data)
+	marker := "# Lota zsh completion path"
+	if strings.Contains(content, marker) {
+		return nil // already configured
+	}
+
+	compDir := filepath.Join(home, ".config", "zsh", "completions")
+	fpathLine := fmt.Sprintf("%s\nfpath+=(%s)", marker, compDir)
+
+	// Try to insert before compinit
+	if idx := strings.Index(content, "compinit"); idx != -1 {
+		// Find the start of that line
+		lineStart := strings.LastIndex(content[:idx], "\n")
+		if lineStart == -1 {
+			lineStart = 0
+		} else {
+			lineStart++
+		}
+		content = content[:lineStart] + fpathLine + "\n" + content[lineStart:]
+	} else {
+		content = content + "\n" + fpathLine + "\n"
+	}
+
+	if err := os.WriteFile(zshrc, []byte(content), 0644); err != nil {
+		return fmt.Errorf("could not write %s: %w", zshrc, err)
+	}
+
+	fmt.Printf("Updated %s with fpath for zsh completions\n", zshrc)
+	fmt.Println("Please reload your shell: exec zsh")
 	return nil
 }

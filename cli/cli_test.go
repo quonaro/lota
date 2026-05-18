@@ -257,6 +257,13 @@ func TestResolveCommand(t *testing.T) {
 			expectGroups:  3,
 			expectRemain:  []string{"--follow"},
 		},
+		{
+			name:         "group with help flag remains group",
+			args:         []string{"dev", "-h"},
+			expectExists: true,
+			expectGroups: 1,
+			expectRemain: []string{"-h"},
+		},
 	}
 
 	for _, tt := range tests {

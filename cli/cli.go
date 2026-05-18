@@ -32,7 +32,7 @@ func Run() error {
 
 	// Hidden completion subcommand: `lota __complete`
 	if len(remainingArgs) > 0 && remainingArgs[0] == "__complete" {
-		RunCompletion()
+		RunCompleteSubcommand(remainingArgs[1:])
 		return nil
 	}
 
@@ -60,7 +60,14 @@ func Run() error {
 			return fmt.Errorf("command not found: %s", strings.Join(remainingArgs, " "))
 		}
 		verbose := flags.Verbose || hasVerboseFlag(remainingArgs)
-		PrintCommandHelp(cfg, result, verbose)
+		switch {
+		case result.Command != nil:
+			PrintCommandHelp(cfg, result, verbose)
+		case len(result.Groups) > 0:
+			PrintGroupHelp(result.Groups[len(result.Groups)-1], verbose)
+		default:
+			PrintHelp(flags.Config)
+		}
 		return nil
 	}
 

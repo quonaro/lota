@@ -8,15 +8,16 @@ import (
 
 // GlobalFlags represents global CLI flags
 type GlobalFlags struct {
-	Help             bool
-	Verbose          bool
-	Version          bool
-	Update           bool
-	DryRun           bool
-	Init             bool
-	Config           string
-	CompletionScript string
-	Timeout          time.Duration // 0 means no timeout
+	Help              bool
+	Verbose           bool
+	Version           bool
+	Update            bool
+	DryRun            bool
+	Init              bool
+	Config            string
+	CompletionScript  string
+	InstallCompletion string        // empty means not requested; "auto" means auto-detect shell
+	Timeout           time.Duration // 0 means no timeout
 }
 
 // ParseGlobalFlags parses global flags from CLI arguments.
@@ -61,6 +62,13 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 			}
 			i++
 			flags.CompletionScript = args[i]
+		case "--install-completion":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				i++
+				flags.InstallCompletion = args[i]
+			} else {
+				flags.InstallCompletion = "auto"
+			}
 		case "--timeout":
 			if i+1 >= len(args) {
 				return GlobalFlags{}, nil, fmt.Errorf("flag --timeout requires a value")
@@ -110,14 +118,17 @@ func hasVerboseFlag(args []string) bool {
 
 // validateFlags checks for conflicting flag combinations
 func validateFlags(flags GlobalFlags) error {
-	if flags.Init && (flags.Help || flags.Version || flags.Update || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
-		return fmt.Errorf("--init cannot be used with --help, --version, --update, --verbose, --dry-run, --completion-script, or --timeout")
+	if flags.Init && (flags.Help || flags.Version || flags.Update || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0) {
+		return fmt.Errorf("--init cannot be used with --help, --version, --update, --verbose, --dry-run, --completion-script, --install-completion, or --timeout")
 	}
-	if flags.CompletionScript != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.Timeout > 0) {
-		return fmt.Errorf("--completion-script cannot be used with --help, --version, --update, --init, --verbose, --dry-run, or --timeout")
+	if flags.CompletionScript != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.InstallCompletion != "" || flags.Timeout > 0) {
+		return fmt.Errorf("--completion-script cannot be used with --help, --version, --update, --init, --verbose, --dry-run, --install-completion, or --timeout")
 	}
-	if flags.Update && (flags.Help || flags.Version || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0 || flags.Config != "") {
-		return fmt.Errorf("--update cannot be used with --help, --version, --init, --verbose, --dry-run, --completion-script, --timeout, or --config")
+	if flags.InstallCompletion != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
+		return fmt.Errorf("--install-completion cannot be used with --help, --version, --update, --init, --verbose, --dry-run, --completion-script, or --timeout")
+	}
+	if flags.Update && (flags.Help || flags.Version || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0 || flags.Config != "") {
+		return fmt.Errorf("--update cannot be used with --help, --version, --init, --verbose, --dry-run, --completion-script, --install-completion, --timeout, or --config")
 	}
 	return nil
 }
@@ -152,6 +163,17 @@ func HandleGlobalFlags(flags GlobalFlags) (bool, error) {
 
 	if flags.Update {
 		if err := PerformUpdate(); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
+
+	if flags.InstallCompletion != "" {
+		shell := flags.InstallCompletion
+		if shell == "auto" {
+			shell = ""
+		}
+		if err := InstallCompletionScript(shell); err != nil {
 			return true, err
 		}
 		return true, nil
