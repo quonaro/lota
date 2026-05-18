@@ -12,12 +12,6 @@ import (
 
 // Run executes the CLI application
 func Run() error {
-	// Check for shell completion mode first (posener/complete reads COMP_LINE and COMP_POINT)
-	if os.Getenv("COMP_LINE") != "" {
-		RunCompletion()
-		return nil
-	}
-
 	if len(os.Args) < 2 {
 		PrintHelp("")
 		return nil
@@ -33,6 +27,12 @@ func Run() error {
 	if shouldExit, err := HandleGlobalFlags(flags); err != nil {
 		return err
 	} else if shouldExit {
+		return nil
+	}
+
+	// Hidden completion subcommand: `lota __complete`
+	if len(remainingArgs) > 0 && remainingArgs[0] == "__complete" {
+		RunCompletion()
 		return nil
 	}
 

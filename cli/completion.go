@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"lota/config"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/posener/complete/v2"
@@ -118,26 +119,95 @@ func (anythingPredictor) Predict(prefix string) []string {
 
 var predictAnything complete.Predictor = anythingPredictor{}
 
-// PrintCompletionScript prints a shell completion installation script.
-func PrintCompletionScript(shell string) error {
-	switch shell {
-	case "bash":
-		fmt.Println("complete -C 'lota' lota")
-	case "zsh":
-		fmt.Println(`#compdef lota
+// completionScripts maps shell names to their completion scripts.
+var completionScripts = map[string]string{
+	"bash": "complete -C 'lota __complete' lota\n",
+	"zsh": `#compdef lota
 function _lota {
     local line="${LBUFFER}${RBUFFER}"
-    local COMP_LINE="$line"
-    local COMP_POINT=${#LBUFFER}
     local -a completions
-    completions=($('lota'))
+    completions=($(env COMP_LINE="$line" COMP_POINT=${#LBUFFER} lota __complete))
     compadd -a completions
 }
-compdef _lota lota`)
-	case "fish":
-		fmt.Println(`complete -c lota -f -a "(env COMP_LINE=(commandline) COMP_POINT=(commandline -C) lota)"`)
-	default:
-		return fmt.Errorf("unsupported shell: %s", shell)
+compdef _lota lota
+`,
+	"fish": `complete -c lota -f -a "(env COMP_LINE=(commandline) COMP_POINT=(commandline -C) lota __complete)"
+`,
+}
+
+// GetCompletionScript returns the completion script content for a given shell.
+func GetCompletionScript(shell string) (string, error) {
+	script, ok := completionScripts[shell]
+	if !ok {
+		return "", fmt.Errorf("unsupported shell: %s", shell)
 	}
+	return script, nil
+}
+
+// PrintCompletionScript prints a shell completion installation script.
+func PrintCompletionScript(shell string) error {
+	script, err := GetCompletionScript(shell)
+	if err != nil {
+		return err
+	}
+	fmt.Print(script)
+	return nil
+}
+
+// detectShell returns the shell name from the $SHELL environment variable.
+func detectShell() string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		return ""
+	}
+	return filepath.Base(shell)
+}
+
+// installPath returns the standard installation path for a completion script.
+func installPath(shell string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine home directory: %w", err)
+	}
+	switch shell {
+	case "bash":
+		return filepath.Join(home, ".local", "share", "bash-completion", "completions", "lota"), nil
+	case "zsh":
+		return filepath.Join(home, ".config", "zsh", "completions", "_lota"), nil
+	case "fish":
+		return filepath.Join(home, ".config", "fish", "completions", "lota.fish"), nil
+	default:
+		return "", fmt.Errorf("unsupported shell: %s", shell)
+	}
+}
+
+// InstallCompletionScript writes the completion script to the standard location.
+func InstallCompletionScript(shell string) error {
+	if shell == "" {
+		shell = detectShell()
+		if shell == "" {
+			return fmt.Errorf("unable to detect shell; specify explicitly: --install-completion bash|zsh|fish")
+		}
+	}
+
+	script, err := GetCompletionScript(shell)
+	if err != nil {
+		return err
+	}
+
+	path, err := installPath(shell)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(path), err)
+	}
+
+	if err := os.WriteFile(path, []byte(script), 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+
+	fmt.Printf("Installed %s completion to %s\n", shell, path)
 	return nil
 }

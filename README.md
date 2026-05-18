@@ -580,8 +580,58 @@ lota infra k8s apply
 | `--dry-run` | Show commands without executing |
 | `--init` | Create a template lota.yml |
 | `--config` | Specify config file or directory |
+| `--install-completion` | Install shell completion script (auto-detects shell) |
+| `--install-completion zsh\|bash\|fish` | Install completion for a specific shell |
+| `--completion-script zsh\|bash\|fish` | Print completion script to stdout |
 
-## 🔍 Upward Config Search
+## 🐚 Shell Completion
+
+Lota provides built-in shell completion for **bash**, **zsh**, and **fish**.
+
+### Auto-install
+
+```bash
+lota --install-completion
+```
+
+Lota detects your shell from `$SHELL` and writes the completion script to the standard location.
+
+### Install for a specific shell
+
+```bash
+lota --install-completion bash
+lota --install-completion zsh
+lota --install-completion fish
+```
+
+### Manual install (print to stdout)
+
+**Bash:**
+```bash
+lota --completion-script bash >> ~/.bashrc
+```
+
+**Zsh:**
+```bash
+lota --completion-script zsh > ~/.config/zsh/completions/_lota
+```
+
+**Fish:**
+```bash
+lota --completion-script fish > ~/.config/fish/completions/lota.fish
+```
+
+### Troubleshooting
+
+If `lota` behaves like a completion engine instead of executing commands:
+
+```bash
+unset COMP_LINE COMP_POINT
+```
+
+Then regenerate and reinstall the completion script for your shell.
+
+## �� Upward Config Search
 
 If `lota.yml` is not found in the current directory, Lota searches upward through parent directories until it finds one or reaches the git root (`.git` directory) or the filesystem root (`/`).
 

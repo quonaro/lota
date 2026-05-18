@@ -47,6 +47,7 @@ func printGlobalOptions() {
 	fmt.Printf("  %-20s %s\n", "-v, --verbose", "Enable detailed logging")
 	fmt.Printf("  %-20s %s\n", "--dry-run", "Show interpolated scripts without executing")
 	fmt.Printf("  %-20s %s\n", "-V, --version", "Print version information")
+	fmt.Printf("  %-20s %s\n", "-U, --update", "Update lota to the latest version")
 	fmt.Printf("  %-20s %s\n", "--init", "Create a default lota.yml in current directory")
 	fmt.Printf("  %-20s %s\n", "--config", "Path to config file or directory")
 }

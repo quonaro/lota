@@ -6,6 +6,7 @@ require (
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
 	github.com/fatih/color v1.19.0
 	github.com/posener/complete/v2 v2.1.0
+	golang.org/x/mod v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

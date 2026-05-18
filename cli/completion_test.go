@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"io"
+	"os"
+	"strings"
 	"testing"
 
 	"lota/config"
@@ -163,20 +166,139 @@ func TestPrintCompletionScript(t *testing.T) {
 	tests := []struct {
 		shell     string
 		shouldErr bool
+		contains  []string
+		excludes  []string
 	}{
-		{"bash", false},
-		{"zsh", false},
-		{"fish", false},
-		{"pwsh", true},
+		{
+			shell:    "bash",
+			contains: []string{"complete -C 'lota __complete' lota"},
+		},
+		{
+			shell:    "zsh",
+			contains: []string{"lota __complete"},
+			excludes: []string{"export COMP_LINE", "export COMP_POINT", "local COMP_LINE", "local COMP_POINT"},
+		},
+		{
+			shell:    "fish",
+			contains: []string{"lota __complete"},
+		},
+		{
+			shell:     "pwsh",
+			shouldErr: true,
+		},
 	}
 
 	for _, tt := range tests {
-		err := PrintCompletionScript(tt.shell)
-		if tt.shouldErr && err == nil {
-			t.Errorf("%s: expected error", tt.shell)
-		}
-		if !tt.shouldErr && err != nil {
-			t.Errorf("%s: unexpected error: %v", tt.shell, err)
-		}
+		t.Run(tt.shell, func(t *testing.T) {
+			// Capture stdout
+			// PrintCompletionScript writes to stdout, so we redirect it temporarily
+			// Using a pipe is the simplest approach
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatalf("pipe error: %v", err)
+			}
+			oldStdout := os.Stdout
+			os.Stdout = w
+
+			scriptErr := PrintCompletionScript(tt.shell)
+
+			if err := w.Close(); err != nil {
+				t.Errorf("failed to close pipe: %v", err)
+			}
+			os.Stdout = oldStdout
+
+			var buf strings.Builder
+			if _, err := io.Copy(&buf, r); err != nil {
+				t.Fatalf("read error: %v", err)
+			}
+			output := buf.String()
+
+			if tt.shouldErr && scriptErr == nil {
+				t.Error("expected error")
+			}
+			if !tt.shouldErr && scriptErr != nil {
+				t.Errorf("unexpected error: %v", scriptErr)
+			}
+			if tt.shouldErr {
+				return
+			}
+			for _, s := range tt.contains {
+				if !strings.Contains(output, s) {
+					t.Errorf("expected output to contain %q, got:\n%s", s, output)
+				}
+			}
+			for _, s := range tt.excludes {
+				if strings.Contains(output, s) {
+					t.Errorf("expected output to NOT contain %q, got:\n%s", s, output)
+				}
+			}
+		})
 	}
+}
+
+func TestGetCompletionScript(t *testing.T) {
+	tests := []struct {
+		shell     string
+		shouldErr bool
+		contains  string
+	}{
+		{"bash", false, "complete -C 'lota __complete' lota"},
+		{"zsh", false, "lota __complete"},
+		{"fish", false, "lota __complete"},
+		{"pwsh", true, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			script, err := GetCompletionScript(tt.shell)
+			if tt.shouldErr {
+				if err == nil {
+					t.Error("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+			if !strings.Contains(script, tt.contains) {
+				t.Errorf("expected script to contain %q, got:\n%s", tt.contains, script)
+			}
+		})
+	}
+}
+
+func TestInstallCompletionScript(t *testing.T) {
+	// Create a temporary home directory to avoid polluting the real one.
+	tmpHome, err := os.MkdirTemp("", "lota-completion-test")
+	if err != nil {
+		t.Fatalf("mkdirtemp error: %v", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(tmpHome); err != nil {
+			t.Errorf("failed to remove temp dir: %v", err)
+		}
+	}()
+
+	// Override the install path by monkey-patching via a custom approach is hard;
+	// instead we test the helper functions directly.
+	for _, shell := range []string{"bash", "zsh", "fish"} {
+		t.Run(shell, func(t *testing.T) {
+			script, err := GetCompletionScript(shell)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if script == "" {
+				t.Error("expected non-empty script")
+			}
+		})
+	}
+
+	// Test unsupported shell
+	t.Run("unsupported", func(t *testing.T) {
+		_, err := GetCompletionScript("pwsh")
+		if err == nil {
+			t.Error("expected error for unsupported shell")
+		}
+	})
 }

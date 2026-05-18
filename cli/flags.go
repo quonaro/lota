@@ -11,6 +11,7 @@ type GlobalFlags struct {
 	Help             bool
 	Verbose          bool
 	Version          bool
+	Update           bool
 	DryRun           bool
 	Init             bool
 	Config           string
@@ -42,6 +43,8 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 			flags.Verbose = true
 		case "--version", "-V":
 			flags.Version = true
+		case "--update", "-U":
+			flags.Update = true
 		case "--dry-run":
 			flags.DryRun = true
 		case "--init":
@@ -107,11 +110,14 @@ func hasVerboseFlag(args []string) bool {
 
 // validateFlags checks for conflicting flag combinations
 func validateFlags(flags GlobalFlags) error {
-	if flags.Init && (flags.Help || flags.Version || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
-		return fmt.Errorf("--init cannot be used with --help, --version, --verbose, --dry-run, --completion-script, or --timeout")
+	if flags.Init && (flags.Help || flags.Version || flags.Update || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
+		return fmt.Errorf("--init cannot be used with --help, --version, --update, --verbose, --dry-run, --completion-script, or --timeout")
 	}
-	if flags.CompletionScript != "" && (flags.Help || flags.Version || flags.Init || flags.Verbose || flags.DryRun || flags.Timeout > 0) {
-		return fmt.Errorf("--completion-script cannot be used with --help, --version, --init, --verbose, --dry-run, or --timeout")
+	if flags.CompletionScript != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.Timeout > 0) {
+		return fmt.Errorf("--completion-script cannot be used with --help, --version, --update, --init, --verbose, --dry-run, or --timeout")
+	}
+	if flags.Update && (flags.Help || flags.Version || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0 || flags.Config != "") {
+		return fmt.Errorf("--update cannot be used with --help, --version, --init, --verbose, --dry-run, --completion-script, --timeout, or --config")
 	}
 	return nil
 }
@@ -139,6 +145,13 @@ func HandleGlobalFlags(flags GlobalFlags) (bool, error) {
 
 	if flags.CompletionScript != "" {
 		if err := PrintCompletionScript(flags.CompletionScript); err != nil {
+			return true, err
+		}
+		return true, nil
+	}
+
+	if flags.Update {
+		if err := PerformUpdate(); err != nil {
 			return true, err
 		}
 		return true, nil

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"lota/config"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -83,6 +84,23 @@ func TestParseGlobalFlags(t *testing.T) {
 		{
 			name:    "config flag without value",
 			input:   []string{"--config"},
+			wantErr: true,
+		},
+		{
+			name:          "update short flag",
+			input:         []string{"-U"},
+			expectedFlags: GlobalFlags{Update: true},
+			expectedArgs:  []string{},
+		},
+		{
+			name:          "update long flag",
+			input:         []string{"--update"},
+			expectedFlags: GlobalFlags{Update: true},
+			expectedArgs:  []string{},
+		},
+		{
+			name:    "update with verbose is invalid",
+			input:   []string{"-U", "-v"},
 			wantErr: true,
 		},
 	}
@@ -261,5 +279,25 @@ func TestResolveCommand(t *testing.T) {
 				t.Errorf("remaining = %v, want %v", remain, tt.expectRemain)
 			}
 		})
+	}
+}
+
+func TestRun_CompLineNoLongerTriggersCompletion(t *testing.T) {
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	// Stray COMP_LINE in env should NOT trigger completion anymore.
+	os.Args = []string{"lota", "__version__should_not_exist"}
+	_ = os.Setenv("COMP_LINE", "lota __version__should_not_exist")
+	_ = os.Setenv("COMP_POINT", "32")
+	defer func() {
+		_ = os.Unsetenv("COMP_LINE")
+		_ = os.Unsetenv("COMP_POINT")
+	}()
+
+	err := Run()
+	// Should fail with "command not found", NOT silently return nil (completion mode).
+	if err == nil {
+		t.Error("expected error for non-existent command, got nil (possible completion mode leak)")
 	}
 }
