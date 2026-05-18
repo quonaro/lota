@@ -130,7 +130,7 @@ func LoadConfig(configPath string) (*config.AppConfig, error) {
 
 	// Print warnings if any
 	for _, warning := range result.Warnings {
-		color.Yellow("Warning: %s\n\n", warning)
+		color.Yellow("Warning: %s\n", warning)
 	}
 
 	if result.Error != nil {
@@ -225,9 +225,7 @@ func RunCommand(ctx context.Context, cfg *config.AppConfig, result config.Search
 	}
 
 	for _, dep := range deps {
-		if opts.Verbose {
-			fmt.Printf("[verbose] running dependency: %s\n", commandPath(dep.Command, dep.Groups))
-		}
+		fmt.Printf("=> Running dependency: %s\n", commandPath(dep.Command, dep.Groups))
 		if err := executeSingleCommand(ctx, cfg, dep, opts); err != nil {
 			return fmt.Errorf("dependency failed: %w", err)
 		}

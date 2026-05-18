@@ -46,9 +46,15 @@ func TestParseGlobalFlags(t *testing.T) {
 			expectedArgs:  []string{},
 		},
 		{
-			name:          "version flag",
+			name:          "version short flag",
 			input:         []string{"-V"},
-			expectedFlags: GlobalFlags{Version: true},
+			expectedFlags: GlobalFlags{VersionShort: true},
+			expectedArgs:  []string{},
+		},
+		{
+			name:          "version long flag",
+			input:         []string{"--version"},
+			expectedFlags: GlobalFlags{VersionLong: true},
 			expectedArgs:  []string{},
 		},
 		{

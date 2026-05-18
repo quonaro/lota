@@ -40,16 +40,24 @@ func PrintVersion() {
 	color.Cyan("version %s\n", shared.Version)
 }
 
+// PrintVersionShort prints a short, machine-friendly version string
+func PrintVersionShort() {
+	fmt.Println(shared.Version)
+}
+
 // printGlobalOptions prints the global options section
 func printGlobalOptions() {
 	fmt.Println("Global Options:")
 	fmt.Printf("  %-20s %s\n", "-h, --help", "Print help information")
 	fmt.Printf("  %-20s %s\n", "-v, --verbose", "Enable detailed logging")
 	fmt.Printf("  %-20s %s\n", "--dry-run", "Show interpolated scripts without executing")
-	fmt.Printf("  %-20s %s\n", "-V, --version", "Print version information")
+	fmt.Printf("  %-20s %s\n", "-V", "Print version only")
+	fmt.Printf("  %-20s %s\n", "--version", "Print version with banner")
 	fmt.Printf("  %-20s %s\n", "-U, --update", "Update lota to the latest version")
 	fmt.Printf("  %-20s %s\n", "--init", "Create a default lota.yml in current directory")
 	fmt.Printf("  %-20s %s\n", "--config", "Path to config file or directory")
+	fmt.Printf("  %-20s %s\n", "--timeout", "Set execution timeout (e.g. 30s, 1m)")
+	fmt.Printf("  %-20s %s\n", "--completion-script [SHELL]", "Print shell completion script")
 	fmt.Printf("  %-20s %s\n", "--install-completion [SHELL]", "Install shell completion (auto-detects if no shell given)")
 }
 
@@ -177,6 +185,58 @@ func printCommandScripts(cmd config.Command) {
 	}
 }
 
+func usageArgName(name string) string {
+	if name == "" {
+		return "ARG"
+	}
+	upper := strings.ToUpper(name)
+	b := strings.Builder{}
+	b.Grow(len(upper))
+	for i := 0; i < len(upper); i++ {
+		ch := upper[i]
+		if (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
+			b.WriteByte(ch)
+			continue
+		}
+		b.WriteByte('_')
+	}
+	value := strings.Trim(b.String(), "_")
+	if value == "" {
+		return "ARG"
+	}
+	return value
+}
+
+func formatPositionalUsage(arg config.Arg) string {
+	name := usageArgName(arg.Name)
+
+	if arg.Wildcard {
+		return "[...<" + name + ">]"
+	}
+
+	value := "<" + name + ">"
+	if arg.Type == "arr" {
+		value = "<" + name + "...>"
+	}
+
+	if arg.Required {
+		return value
+	}
+
+	return "[" + value + "]"
+}
+
+func buildCommandUsage(cmdName string, positionalArgs, flagArgs []config.Arg) string {
+	parts := []string{fmt.Sprintf("Usage: %s %s", strings.ToLower(shared.AppName), cmdName)}
+	if len(flagArgs) > 0 {
+		parts = append(parts, "[OPTIONS]")
+	}
+	for _, arg := range positionalArgs {
+		parts = append(parts, formatPositionalUsage(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
 // PrintCommandHelp displays help for a specific command
 func PrintCommandHelp(cfg *config.AppConfig, result config.SearchResult, verbose bool) {
 	if result.Command == nil {
@@ -186,18 +246,19 @@ func PrintCommandHelp(cfg *config.AppConfig, result config.SearchResult, verbose
 	cmd := *result.Command
 	cmdName := buildCommandName(cmd, result.Groups)
 
-	fmt.Printf("Usage: %s %s [ARGS]\n", strings.ToLower(shared.AppName), cmdName)
-	fmt.Println()
-	if cmd.Desc != "" {
-		fmt.Println(cmd.Desc)
-		fmt.Println()
-	}
-
 	// Resolve all arguments and determine their origin scope
 	args := runner.ResolveArgs(*cfg, result.Groups, cmd)
 
 	// Separate positional arguments from flags/options
 	positionalArgs, flagArgs := separateArgs(args)
+
+	fmt.Println(buildCommandUsage(cmdName, positionalArgs, flagArgs))
+
+	fmt.Println()
+	if cmd.Desc != "" {
+		fmt.Println(cmd.Desc)
+		fmt.Println()
+	}
 
 	printCommandArgs(positionalArgs, flagArgs, *cfg, result.Groups, cmd, verbose)
 

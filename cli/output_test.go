@@ -58,6 +58,31 @@ func TestIsFlagArg(t *testing.T) {
 	}
 }
 
+func TestBuildCommandUsage(t *testing.T) {
+	positional := []config.Arg{
+		{Name: "service", Required: true, Type: "str"},
+		{Name: "env", Required: false, Type: "str"},
+		{Name: "files", Type: "arr"},
+		{Name: "tail", Wildcard: true},
+	}
+	flags := []config.Arg{{Name: "verbose", Type: "bool"}}
+
+	got := buildCommandUsage("infra deploy", positional, flags)
+	want := "Usage: lota infra deploy [OPTIONS] <SERVICE> [<ENV>] [<FILES...>] [...<TAIL>]"
+	if got != want {
+		t.Fatalf("buildCommandUsage() = %q, want %q", got, want)
+	}
+}
+
+func TestUsageArgName(t *testing.T) {
+	if got := usageArgName("service-name"); got != "SERVICE_NAME" {
+		t.Fatalf("usageArgName() = %q, want %q", got, "SERVICE_NAME")
+	}
+	if got := usageArgName("!!!"); got != "ARG" {
+		t.Fatalf("usageArgName() = %q, want %q", got, "ARG")
+	}
+}
+
 func TestSeparateArgs(t *testing.T) {
 	args := []config.Arg{
 		{Name: "filename", Type: "str"},            // positional

@@ -1,8 +1,10 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"lota/config"
 	"os"
 	"path/filepath"
@@ -52,6 +54,44 @@ func TestExecuteCommand_DryRun_BeforeHookNotExecuted(t *testing.T) {
 
 	if _, err := os.Stat(marker); err == nil {
 		t.Error("before hook was executed despite dry-run mode")
+	}
+}
+
+func TestExecuteCommand_DryRun_PrintsScriptAndAfter(t *testing.T) {
+	cmd := &config.Command{
+		Name:   "test",
+		Before: "echo before",
+		Script: "echo script",
+		After:  "echo after",
+	}
+	ctx := InterpolationContext{Vars: map[string]string{"Z": "2", "A": "1"}, Args: map[string]string{}}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe error: %v", err)
+	}
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	runErr := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{DryRun: true}, "sh -c", "")
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if runErr != nil {
+		t.Fatalf("unexpected error: %v", runErr)
+	}
+
+	var out bytes.Buffer
+	if _, err := io.Copy(&out, r); err != nil {
+		t.Fatalf("read output error: %v", err)
+	}
+	text := out.String()
+
+	for _, fragment := range []string{"[dry-run] env:", "  A=1", "  Z=2", "[dry-run] before:", "[dry-run] script:", "[dry-run] after:"} {
+		if !strings.Contains(text, fragment) {
+			t.Fatalf("expected output to contain %q, got %q", fragment, text)
+		}
 	}
 }
 
@@ -303,5 +343,8 @@ func TestExecuteCommand_ExitCodePropagation(t *testing.T) {
 	}
 	if shellErr.ExitCode != 42 {
 		t.Errorf("expected exit code 42, got %d", shellErr.ExitCode)
+	}
+	if !strings.Contains(shellErr.Command, "exit 42") {
+		t.Errorf("expected command summary to contain script fragment, got %q", shellErr.Command)
 	}
 }

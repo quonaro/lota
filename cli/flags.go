@@ -10,7 +10,8 @@ import (
 type GlobalFlags struct {
 	Help              bool
 	Verbose           bool
-	Version           bool
+	VersionShort      bool
+	VersionLong       bool
 	Update            bool
 	DryRun            bool
 	Init              bool
@@ -42,8 +43,10 @@ func ParseGlobalFlags(args []string) (GlobalFlags, []string, error) {
 			flags.Help = true
 		case "--verbose", "-v":
 			flags.Verbose = true
-		case "--version", "-V":
-			flags.Version = true
+		case "--version":
+			flags.VersionLong = true
+		case "-V":
+			flags.VersionShort = true
 		case "--update", "-U":
 			flags.Update = true
 		case "--dry-run":
@@ -118,16 +121,18 @@ func hasVerboseFlag(args []string) bool {
 
 // validateFlags checks for conflicting flag combinations
 func validateFlags(flags GlobalFlags) error {
-	if flags.Init && (flags.Help || flags.Version || flags.Update || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0) {
+	hasVersion := flags.VersionShort || flags.VersionLong
+
+	if flags.Init && (flags.Help || hasVersion || flags.Update || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0) {
 		return fmt.Errorf("--init cannot be used with --help, --version, --update, --verbose, --dry-run, --completion-script, --install-completion, or --timeout")
 	}
-	if flags.CompletionScript != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.InstallCompletion != "" || flags.Timeout > 0) {
+	if flags.CompletionScript != "" && (flags.Help || hasVersion || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.InstallCompletion != "" || flags.Timeout > 0) {
 		return fmt.Errorf("--completion-script cannot be used with --help, --version, --update, --init, --verbose, --dry-run, --install-completion, or --timeout")
 	}
-	if flags.InstallCompletion != "" && (flags.Help || flags.Version || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
+	if flags.InstallCompletion != "" && (flags.Help || hasVersion || flags.Update || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.Timeout > 0) {
 		return fmt.Errorf("--install-completion cannot be used with --help, --version, --update, --init, --verbose, --dry-run, --completion-script, or --timeout")
 	}
-	if flags.Update && (flags.Help || flags.Version || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0 || flags.Config != "") {
+	if flags.Update && (flags.Help || hasVersion || flags.Init || flags.Verbose || flags.DryRun || flags.CompletionScript != "" || flags.InstallCompletion != "" || flags.Timeout > 0 || flags.Config != "") {
 		return fmt.Errorf("--update cannot be used with --help, --version, --init, --verbose, --dry-run, --completion-script, --install-completion, --timeout, or --config")
 	}
 	return nil
@@ -142,7 +147,12 @@ func HandleGlobalFlags(flags GlobalFlags) (bool, error) {
 		return true, nil
 	}
 
-	if flags.Version {
+	if flags.VersionShort {
+		PrintVersionShort()
+		return true, nil
+	}
+
+	if flags.VersionLong {
 		PrintVersion()
 		return true, nil
 	}

@@ -7,7 +7,6 @@ import (
 	"lota/runner"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Run executes the CLI application
@@ -57,7 +56,7 @@ func Run() error {
 		// Resolve command to show help for it
 		result, _, _ := ResolveCommand(cfg, remainingArgs)
 		if !result.Exists {
-			return fmt.Errorf("command not found: %s", strings.Join(remainingArgs, " "))
+			return commandNotFoundError(cfg, remainingArgs)
 		}
 		verbose := flags.Verbose || hasVerboseFlag(remainingArgs)
 		switch {
@@ -73,7 +72,7 @@ func Run() error {
 
 	result, cmdArgs, _ := ResolveCommand(cfg, remainingArgs)
 	if !result.Exists {
-		return fmt.Errorf("command not found: %s", strings.Join(remainingArgs, " "))
+		return commandNotFoundError(cfg, remainingArgs)
 	}
 
 	verbose := flags.Verbose || hasVerboseFlag(cmdArgs)

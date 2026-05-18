@@ -575,7 +575,8 @@ lota infra k8s apply
 | Flag | Description |
 |------|-------------|
 | `-h`, `--help` | Show help |
-| `-V`, `--version` | Show version |
+| `-V` | Show version only (machine-friendly) |
+| `--version` | Show version with ASCII banner |
 | `-v`, `--verbose` | Enable verbose output |
 | `--dry-run` | Show commands without executing |
 | `--init` | Create a template lota.yml |

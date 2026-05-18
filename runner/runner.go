@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -47,7 +48,7 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return &ShellError{
 				ExitCode: exitErr.ExitCode(),
-				Command:  parts[0] + " -c",
+				Command:  summarizeShellCommand(parts, script),
 			}
 		}
 		return err
@@ -55,15 +56,46 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 	return nil
 }
 
+func summarizeShellCommand(shellParts []string, script string) string {
+	base := strings.Join(shellParts, " ")
+	trimmed := strings.TrimSpace(script)
+	if trimmed == "" {
+		return base
+	}
+	trimmed = strings.ReplaceAll(trimmed, "\n", " ")
+	trimmed = strings.Join(strings.Fields(trimmed), " ")
+	if len(trimmed) > 80 {
+		trimmed = trimmed[:80] + "..."
+	}
+	return fmt.Sprintf("%s %q", base, trimmed)
+}
+
+func sortedMapKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx InterpolationContext, opts RunOptions, shell string, dir string) error {
 	unified := MergeVarsAndArgs(interpCtx.Vars, interpCtx.Args)
 	env := VarsToEnv(unified)
+	envKeys := sortedMapKeys(unified)
 
 	if opts.Verbose {
 		fmt.Printf("[verbose] command: %s\n", cmd.Name)
 		fmt.Println("[verbose] env:")
-		for k, v := range unified {
-			fmt.Printf("  %s=%s\n", k, v)
+		for _, k := range envKeys {
+			fmt.Printf("  %s=%s\n", k, unified[k])
+		}
+	}
+
+	if opts.DryRun {
+		fmt.Println("[dry-run] env:")
+		for _, k := range envKeys {
+			fmt.Printf("  %s=%s\n", k, unified[k])
 		}
 	}
 
@@ -105,9 +137,7 @@ func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx Interpol
 		}
 		if opts.DryRun {
 			fmt.Printf("[dry-run] script:\n%s\n", interpolatedScript)
-			return nil
-		}
-		if err := executeShell(ctx, interpolatedScript, env, shell, opts.ConfigDir, dir); err != nil {
+		} else if err := executeShell(ctx, interpolatedScript, env, shell, opts.ConfigDir, dir); err != nil {
 			scriptErr = err
 		}
 	}
@@ -123,9 +153,7 @@ func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx Interpol
 		}
 		if opts.DryRun {
 			fmt.Printf("[dry-run] after:\n%s\n", interpolatedAfter)
-			return nil
-		}
-		if err := executeShell(ctx, interpolatedAfter, env, shell, opts.ConfigDir, dir); err != nil {
+		} else if err := executeShell(ctx, interpolatedAfter, env, shell, opts.ConfigDir, dir); err != nil {
 			if scriptErr != nil {
 				fmt.Fprintf(os.Stderr, "after hook failed: %v\n", err)
 			} else {

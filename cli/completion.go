@@ -197,7 +197,7 @@ func nextPositionalHint(cmdArgs []icomp.Arg, argDefs []config.Arg) string {
 func positionalPlaceholder(name string) string {
 	upper := strings.ToUpper(name)
 	b := strings.Builder{}
-	b.Grow(len(upper) + len("_ARG"))
+	b.Grow(len(upper))
 	for i := 0; i < len(upper); i++ {
 		ch := upper[i]
 		if (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') {
@@ -209,9 +209,6 @@ func positionalPlaceholder(name string) string {
 	value := strings.Trim(b.String(), "_")
 	if value == "" {
 		value = "ARG"
-	}
-	if !strings.HasSuffix(value, "_ARG") {
-		value += "_ARG"
 	}
 	return "<" + value + ">"
 }

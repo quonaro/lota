@@ -1,7 +1,13 @@
 package cli
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"lota/config"
+	"lota/runner"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -130,4 +136,47 @@ func TestResolveDependencies(t *testing.T) {
 			t.Errorf("expected [build], got %v", deps)
 		}
 	})
+}
+
+func TestRunCommand_PrintsDependencyProgress(t *testing.T) {
+	cfg := &config.AppConfig{
+		Commands: []config.Command{
+			{Name: "build", Script: "echo build >/dev/null"},
+			{Name: "test", Script: "echo test >/dev/null", Depends: []string{"build"}},
+		},
+	}
+	if err := cfg.BuildIndexes(); err != nil {
+		t.Fatalf("BuildIndexes() error: %v", err)
+	}
+
+	result, err := FindCommandByPath(cfg, "test")
+	if err != nil {
+		t.Fatalf("FindCommandByPath() error: %v", err)
+	}
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe error: %v", err)
+	}
+
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	runErr := RunCommand(context.Background(), cfg, result, nil, runner.RunOptions{})
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if runErr != nil {
+		t.Fatalf("RunCommand() error: %v", runErr)
+	}
+
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		t.Fatalf("failed reading output: %v", err)
+	}
+
+	if !strings.Contains(buf.String(), "=> Running dependency: build") {
+		t.Fatalf("expected dependency progress output, got %q", buf.String())
+	}
 }

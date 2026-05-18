@@ -594,7 +594,7 @@ func TestPositionalCompletionHint_ExpectedPositional(t *testing.T) {
 	args := extractCompletionArgs(parsed, "lota")
 
 	hint := positionalCompletionHint(cfg, args)
-	want := "expected positional arg: <SERVICE_ARG>"
+	want := "expected positional arg: <SERVICE>"
 	if hint != want {
 		t.Fatalf("unexpected hint: got %q, want %q", hint, want)
 	}
