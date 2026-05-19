@@ -27,7 +27,7 @@ type ShellError struct {
 }
 
 func (e *ShellError) Error() string {
-	return fmt.Sprintf("command %q exited with code %d", e.Command, e.ExitCode)
+	return fmt.Sprintf("command %s exited with code %d", e.Command, e.ExitCode)
 }
 
 // executeShell runs a script in shell with environment variables
@@ -57,17 +57,16 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 }
 
 func summarizeShellCommand(shellParts []string, script string) string {
-	base := strings.Join(shellParts, " ")
 	trimmed := strings.TrimSpace(script)
 	if trimmed == "" {
-		return base
+		return strings.Join(shellParts, " ")
 	}
 	trimmed = strings.ReplaceAll(trimmed, "\n", " ")
 	trimmed = strings.Join(strings.Fields(trimmed), " ")
 	if len(trimmed) > 80 {
 		trimmed = trimmed[:80] + "..."
 	}
-	return fmt.Sprintf("%s %q", base, trimmed)
+	return trimmed
 }
 
 func sortedMapKeys(m map[string]string) []string {
