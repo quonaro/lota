@@ -1,10 +1,10 @@
 # Lota
 
-A declarative task runner for rapid development. Define commands in a YAML file and run them from the terminal.
+A configurable task runner for rapid development. Define commands in a YAML file and run them from the terminal.
 
 ## Features
 
-- ✨ **Declarative configuration** - Define tasks in YAML, no code needed
+- ✨ **Configurable tasks** - Define tasks in YAML, no code needed
 - 🔧 **Flexible arguments** - Positional, flags, wildcards, arrays with type validation
 - 🔄 **Variable interpolation** - Environment variables with hierarchical scoping
 - 🐚 **Shell-aware execution** - Auto-detects shell binary, overridable at any level
@@ -84,7 +84,94 @@ lota dev run
 lota dev test
 ```
 
-## 💡 Examples
+## Comparison
+
+| Feature                   | Lota | Task | Just | npm scripts |
+| ------------------------- | ---- | ---- | ---- | ----------- |
+| Declarative YAML          | ✅   | ✅   | ✅   | ❌          |
+| Type-safe arguments       | ✅   | ✅   | ✅   | ❌          |
+| Variable interpolation    | ✅   | ✅   | ✅   | ✅          |
+| Nested groups             | ✅   | ✅   | ❌   | ❌          |
+| Working directory (`dir`) | ✅   | ✅   | ❌   | ❌          |
+| Command dependencies      | ✅   | ✅   | ✅   | ❌          |
+| Upward config search      | ✅   | ❌   | ❌   | ❌          |
+| Env file imports          | ✅   | ✅   | ❌   | ❌          |
+| Shell auto-detection      | ✅   | ❌   | ❌   | ❌          |
+
+### Syntax Comparison
+
+**Simple build command:**
+
+```yaml
+# Lota
+build:
+  script: go build -o app .
+
+# Task (Taskfile.yml)
+build:
+  cmds:
+    - go build -o app .
+
+# Just
+build:
+    go build -o app .
+
+# npm scripts
+"build": "go build -o app ."
+```
+
+**With arguments:**
+
+```yaml
+# Lota
+dev:
+  args:
+    - port|p:int=3000
+  script: npm start -- --port $port
+
+# Task (Taskfile.yml)
+build:
+  vars:
+    PORT: 3000
+  cmds:
+    - npm start -- --port {{.PORT}}
+
+# Just
+port := "3000"
+dev:
+    npm start -- --port {{port}}
+
+# npm scripts
+"dev": "npm start -- --port ${PORT:-3000}"
+```
+
+**With dependencies:**
+
+```yaml
+# Lota
+test:
+  depends:
+    - build
+  script: go test ./...
+
+# Task (Taskfile.yml)
+test:
+  deps: [build]
+  cmds:
+    - go test ./...
+
+# Just
+build:
+    go build -o app .
+
+test: build
+    go test ./...
+
+# npm scripts
+"test": "npm run build && go test ./..."
+```
+
+## Examples
 
 ### Simple Web Project
 
@@ -495,9 +582,9 @@ deploy:
 
 ### 🐚 Shell Configuration
 
-Lota auto-detects the shell binary (`bash` by default).
-
 **Important:** Lota selects the shell interpreter, but the script itself is **shell-specific**. Write scripts for the shell you target.
+
+Lota auto-detects the shell binary from the system environment. If detection fails, it falls back to `bash`.
 
 Override the shell at any level:
 
@@ -556,16 +643,94 @@ deploy:
 
 Dependencies execute with **their own context** (shell, vars, dir, default args). Circular dependencies are detected automatically and produce an error.
 
-### ⚡ Hooks (`before` / `after`)
+> **TODO:** Parallel execution of independent dependencies is not yet implemented. All dependencies run sequentially.
+
+### ⚡ Hooks Tutorial
+
+Lota provides five execution stages per command. You only use what you need — a simple `script` is enough for most tasks.
+
+```
+before → script → after → finally
+          ↓
+    fallback → finally
+```
+
+| Stage          | Purpose                                      | Runs on error?                      |
+| -------------- | -------------------------------------------- | ----------------------------------- |
+| **`before`**   | Preparation (compile, check env)             | Skips `script`, triggers `fallback` |
+| **`script`**   | Main command                                 | Triggers `fallback`                 |
+| **`after`**    | Post-success action (notify, log)            | Triggers `fallback`                 |
+| **`fallback`** | Error handler (rollback, alert)              | Continues to `finally`              |
+| **`finally`**  | Cleanup (stop containers, remove temp files) | Always runs                         |
+
+> Return code: `0` if `before`+`script`+`after` succeeded. Otherwise the first error's exit code. `fallback`/`finally` errors are printed to stderr but do not change the return code.
+
+#### Example 1: Basic Pipeline
+
+```yaml
+build:
+  before: echo "Compiling..."
+  script: go build -o bin/app .
+  after: echo "Build complete"
+```
+
+**Happy path:** `before` → `script` → `after` → return 0
+
+**If `script` fails:** `before` → `script` (exit 1) → return 1. `after` is skipped.
+
+#### Example 2: Cleanup with `finally`
+
+Use `finally` for operations that must run regardless of success or failure.
+
+```yaml
+test:
+  before: docker-compose up -d test-db
+  script: go test ./...
+  finally: docker-compose down test-db
+```
+
+**Any outcome:** `before` → `script` → `finally` → return 0 or 1. The database container is always stopped.
+
+#### Example 3: Error Handling with `fallback`
+
+Use `fallback` to react to failures — rollback, send alerts, write crash reports.
 
 ```yaml
 deploy:
   before: echo "Starting deploy..."
   script: ./deploy.sh
-  after: echo "Done."
+  after: echo "Deploy successful"
+  fallback: ./rollback.sh
+  finally: echo "Deploy finished"
 ```
 
-`after` always runs, even if `script` fails.
+**Happy path:** before → script → after → finally → return 0
+**Script fails:** before → script (fail) → fallback → finally → return 1
+**After fails:** before → script → after (fail) → fallback → finally → return 1
+
+#### Example 4: Full Pipeline — Database Migration
+
+```yaml
+db:
+  migrate:
+    before: |
+      echo "Creating backup..."
+      pg_dump mydb > /tmp/backup.sql
+    script: |
+      echo "Running migrations..."
+      migrate -path ./migrations -database "$DATABASE_URL" up
+    after: echo "Migration complete"
+    fallback: |
+      echo "Migration failed, restoring backup..."
+      psql mydb < /tmp/backup.sql
+    finally: rm -f /tmp/backup.sql
+```
+
+| Scenario        | Flow                                                                           |
+| --------------- | ------------------------------------------------------------------------------ |
+| Success         | before → script → after → finally (backup deleted)                             |
+| Migration fails | before → script (fail) → fallback (restore) → finally (backup deleted)         |
+| After fails     | before → script → after (fail) → fallback (restore) → finally (backup deleted) |
 
 ### 📝 Tee Logging (`log`)
 
@@ -842,20 +1007,6 @@ Key design principles:
 - Context-aware execution with graceful shutdown
 - Pure functions for interpolation and parsing (testable)
 - Clean error handling with wrapped errors
-
-## 🆚 Comparison
-
-| Feature                   | Lota | Make | npm scripts | Just |
-| ------------------------- | ---- | ---- | ----------- | ---- |
-| Declarative YAML          | ✅   | ❌   | ❌          | ✅   |
-| Type-safe arguments       | ✅   | ❌   | ❌          | ✅   |
-| Variable interpolation    | ✅   | ✅   | ✅          | ✅   |
-| Nested groups             | ✅   | ❌   | ❌          | ❌   |
-| Working directory (`dir`) | ✅   | ❌   | ❌          | ❌   |
-| Command dependencies      | ✅   | ✅   | ❌          | ✅   |
-| Upward config search      | ✅   | ❌   | ❌          | ❌   |
-| Env file imports          | ✅   | ❌   | ❌          | ❌   |
-| Shell auto-detection      | ✅   | ❌   | ❌          | ❌   |
 
 ## 📜 License
 

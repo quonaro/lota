@@ -263,7 +263,7 @@ func TestExecuteCommand_ArgsOverrideVarsInEnv(t *testing.T) {
 	}
 }
 
-func TestExecuteCommand_AfterRunsOnScriptFailure(t *testing.T) {
+func TestExecuteCommand_AfterNotRunOnScriptFailure(t *testing.T) {
 	dir := t.TempDir()
 	afterMarker := filepath.Join(dir, "after")
 
@@ -279,8 +279,8 @@ func TestExecuteCommand_AfterRunsOnScriptFailure(t *testing.T) {
 		t.Fatal("expected script error, got nil")
 	}
 
-	if _, err := os.Stat(afterMarker); err != nil {
-		t.Error("after hook was not executed after script failure")
+	if _, err := os.Stat(afterMarker); err == nil {
+		t.Error("after hook should not run when script fails")
 	}
 }
 
@@ -303,6 +303,114 @@ func TestExecuteCommand_AfterNotRunOnBeforeFailure(t *testing.T) {
 
 	if _, err := os.Stat(afterMarker); err == nil {
 		t.Error("after hook should not run when before fails")
+	}
+}
+
+func TestExecuteCommand_FallbackRunsOnScriptFailure(t *testing.T) {
+	dir := t.TempDir()
+	fallbackMarker := filepath.Join(dir, "fallback")
+
+	cmd := &config.Command{
+		Name:     "test",
+		Script:   "exit 1",
+		Fallback: fmt.Sprintf("touch \"%s\"", fallbackMarker),
+	}
+	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
+
+	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
+	if err == nil {
+		t.Fatal("expected script error, got nil")
+	}
+
+	if _, err := os.Stat(fallbackMarker); err != nil {
+		t.Error("fallback hook was not executed after script failure")
+	}
+}
+
+func TestExecuteCommand_FallbackRunsOnBeforeFailure(t *testing.T) {
+	dir := t.TempDir()
+	fallbackMarker := filepath.Join(dir, "fallback")
+
+	cmd := &config.Command{
+		Name:     "test",
+		Before:   "exit 1",
+		Script:   "echo noop",
+		Fallback: fmt.Sprintf("touch \"%s\"", fallbackMarker),
+	}
+	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
+
+	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
+	if err == nil {
+		t.Fatal("expected before error, got nil")
+	}
+
+	if _, err := os.Stat(fallbackMarker); err != nil {
+		t.Error("fallback hook was not executed after before failure")
+	}
+}
+
+func TestExecuteCommand_FallbackRunsOnAfterFailure(t *testing.T) {
+	dir := t.TempDir()
+	fallbackMarker := filepath.Join(dir, "fallback")
+
+	cmd := &config.Command{
+		Name:     "test",
+		Script:   "echo noop",
+		After:    "exit 1",
+		Fallback: fmt.Sprintf("touch \"%s\"", fallbackMarker),
+	}
+	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
+
+	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
+	if err == nil {
+		t.Fatal("expected after error, got nil")
+	}
+
+	if _, err := os.Stat(fallbackMarker); err != nil {
+		t.Error("fallback hook was not executed after after failure")
+	}
+}
+
+func TestExecuteCommand_FinallyAlwaysRuns(t *testing.T) {
+	dir := t.TempDir()
+	finallyMarker := filepath.Join(dir, "finally")
+
+	cmd := &config.Command{
+		Name:    "test",
+		Script:  "exit 1",
+		Finally: fmt.Sprintf("touch \"%s\"", finallyMarker),
+	}
+	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
+
+	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
+	if err == nil {
+		t.Fatal("expected script error, got nil")
+	}
+
+	if _, err := os.Stat(finallyMarker); err != nil {
+		t.Error("finally hook was not executed after script failure")
+	}
+}
+
+func TestExecuteCommand_FinallyRunsEvenIfFallbackFails(t *testing.T) {
+	dir := t.TempDir()
+	finallyMarker := filepath.Join(dir, "finally")
+
+	cmd := &config.Command{
+		Name:     "test",
+		Script:   "exit 1",
+		Fallback: "exit 1",
+		Finally:  fmt.Sprintf("touch \"%s\"", finallyMarker),
+	}
+	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
+
+	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
+	if err == nil {
+		t.Fatal("expected script error, got nil")
+	}
+
+	if _, err := os.Stat(finallyMarker); err != nil {
+		t.Error("finally hook was not executed when both script and fallback failed")
 	}
 }
 

@@ -56,6 +56,8 @@ type Command struct {
 	Script       string     `yaml:"script"`
 	Before       string     `yaml:"before"`
 	After        string     `yaml:"after"`
+	Fallback     string     `yaml:"fallback"`
+	Finally      string     `yaml:"finally"`
 }
 
 type Arg struct {

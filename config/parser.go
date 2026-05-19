@@ -92,7 +92,7 @@ func hasField(node *yaml.Node, field string) bool {
 }
 
 var groupFields = []string{"desc", "dir", "color", "inherit_color", "vars", "args", "shell", "log"}
-var commandFields = []string{"desc", "dir", "color", "inherit_color", "vars", "args", "script", "before", "after", "depends", "shell", "log"}
+var commandFields = []string{"desc", "dir", "color", "inherit_color", "vars", "args", "script", "before", "after", "fallback", "finally", "depends", "shell", "log"}
 
 func suggestField(unknown string, valid []string) string {
 	best := ""
@@ -437,6 +437,10 @@ func (c *Command) UnmarshalYAML(node *yaml.Node) error {
 			c.Before = valueNode.Value
 		case "after":
 			c.After = valueNode.Value
+		case "fallback":
+			c.Fallback = valueNode.Value
+		case "finally":
+			c.Finally = valueNode.Value
 		case "depends":
 			if err := valueNode.Decode(&c.Depends); err != nil {
 				return fmt.Errorf("%d: error parsing depends in command %q: %w", valueNode.Line, c.Name, err)

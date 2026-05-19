@@ -4,7 +4,7 @@ const (
 	ConfigFileName     = "lota.yml"
 	ConfigFileNameYAML = "lota.yaml"
 	AppName            = "Lota"
-	AppDescription     = "A declarative task runner for rapid development."
+	AppDescription     = "A configurable task runner for rapid development."
 )
 
 var (

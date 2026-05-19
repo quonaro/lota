@@ -213,62 +213,60 @@ func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx Interpol
 		defer cancel()
 	}
 
-	var scriptErr error
+	var execErr error
+	failed := false
+
+	runStage := func(name, script string) error {
+		interpolated, err := Interpolate(script, interpCtx)
+		if err != nil {
+			return fmt.Errorf("%s hook interpolation failed: %w", name, err)
+		}
+		if opts.Verbose {
+			fmt.Printf("[verbose] %s: %s\n", name, interpolated)
+		}
+		if opts.DryRun {
+			fmt.Printf("[dry-run] %s:\n%s\n", name, interpolated)
+		}
+		return executeShell(ctx, interpolated, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun)
+	}
 
 	// before hook
 	if cmd.Before != "" {
-		interpolatedBefore, err := Interpolate(cmd.Before, interpCtx)
-		if err != nil {
-			return fmt.Errorf("before hook interpolation failed: %w", err)
-		}
-		if opts.Verbose {
-			fmt.Printf("[verbose] before: %s\n", interpolatedBefore)
-		}
-		if opts.DryRun {
-			fmt.Printf("[dry-run] before:\n%s\n", interpolatedBefore)
-		}
-		if err := executeShell(ctx, interpolatedBefore, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun); err != nil {
-			return fmt.Errorf("before hook failed: %w", err)
+		if err := runStage("before", cmd.Before); err != nil {
+			execErr = fmt.Errorf("before hook failed: %w", err)
+			failed = true
 		}
 	}
 
 	// script
-	if cmd.Script != "" {
-		interpolatedScript, err := Interpolate(cmd.Script, interpCtx)
-		if err != nil {
-			return err
-		}
-		if opts.Verbose {
-			fmt.Printf("[verbose] script: %s\n", interpolatedScript)
-		}
-		if opts.DryRun {
-			fmt.Printf("[dry-run] script:\n%s\n", interpolatedScript)
-		}
-		if err := executeShell(ctx, interpolatedScript, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun); err != nil {
-			scriptErr = err
+	if !failed && cmd.Script != "" {
+		if err := runStage("script", cmd.Script); err != nil {
+			execErr = err
+			failed = true
 		}
 	}
 
-	// after hook — runs always unless before failed (before failure returns early)
-	if cmd.After != "" {
-		interpolatedAfter, err := Interpolate(cmd.After, interpCtx)
-		if err != nil {
-			return fmt.Errorf("after hook interpolation failed: %w", err)
-		}
-		if opts.Verbose {
-			fmt.Printf("[verbose] after: %s\n", interpolatedAfter)
-		}
-		if opts.DryRun {
-			fmt.Printf("[dry-run] after:\n%s\n", interpolatedAfter)
-		}
-		if err := executeShell(ctx, interpolatedAfter, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun); err != nil {
-			if scriptErr != nil {
-				fmt.Fprintf(os.Stderr, "after hook failed: %v\n", err)
-			} else {
-				scriptErr = fmt.Errorf("after hook failed: %w", err)
-			}
+	// after hook — runs only if before and script succeeded
+	if !failed && cmd.After != "" {
+		if err := runStage("after", cmd.After); err != nil {
+			execErr = fmt.Errorf("after hook failed: %w", err)
+			failed = true
 		}
 	}
 
-	return scriptErr
+	// fallback hook — runs on any error in before/script/after
+	if failed && cmd.Fallback != "" {
+		if err := runStage("fallback", cmd.Fallback); err != nil {
+			fmt.Fprintf(os.Stderr, "fallback hook failed: %v\n", err)
+		}
+	}
+
+	// finally hook — always runs at the end
+	if cmd.Finally != "" {
+		if err := runStage("finally", cmd.Finally); err != nil {
+			fmt.Fprintf(os.Stderr, "finally hook failed: %v\n", err)
+		}
+	}
+
+	return execErr
 }
