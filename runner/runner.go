@@ -10,8 +10,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
+
+var shutdownOnce sync.Once
 
 // PrefixWriter wraps an io.Writer and prefixes each line with a task name.
 type PrefixWriter struct {
@@ -166,9 +170,10 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 	if len(parts) == 0 {
 		return fmt.Errorf("empty shell command")
 	}
-	cmd := exec.CommandContext(ctx, parts[0], append(parts[1:], script)...)
+	cmd := exec.Command(parts[0], append(parts[1:], script)...)
 	cmd.Env = append(os.Environ(), env...)
 	cmd.Dir = resolveDir(baseDir, workingDir, dir)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	// Resolve log paths and open files
 	var logFiles []*os.File
@@ -206,16 +211,22 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 	if needsPTY {
 		stdoutMW := io.MultiWriter(stdoutWriters...)
 		stderrMW := io.MultiWriter(stderrWriters...)
-		used, ptyErr := runWithPTY(cmd, stdoutMW, stderrMW)
+		used, ptyErr := runWithPTY(cmd, stdoutMW, stderrMW, ctx)
 		if !used {
 			assignOutput(cmd, stdoutWriters, stderrWriters)
-			err = cmd.Run()
+			if err = cmd.Start(); err != nil {
+				return fmt.Errorf("start command: %w", err)
+			}
+			err = gracefulWait(cmd, ctx)
 		} else {
 			err = ptyErr
 		}
 	} else {
 		assignOutput(cmd, stdoutWriters, stderrWriters)
-		err = cmd.Run()
+		if err = cmd.Start(); err != nil {
+			return fmt.Errorf("start command: %w", err)
+		}
+		err = gracefulWait(cmd, ctx)
 	}
 	closeLogFiles(logFiles)
 
@@ -229,6 +240,38 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 		return err
 	}
 	return nil
+}
+
+// gracefulWait waits for cmd to finish. If ctx is cancelled, it sends SIGTERM
+// to the process group, waits up to 10s, then SIGKILL.
+func gracefulWait(cmd *exec.Cmd, ctx context.Context) error {
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		shutdownOnce.Do(func() {
+			fmt.Fprintf(os.Stderr, "\r\033[KReceived signal, shutting down gracefully...\n")
+		})
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+		}
+
+		select {
+		case <-done:
+			return ctx.Err()
+		case <-time.After(10 * time.Second):
+			fmt.Fprintln(os.Stderr, "Grace period exceeded, force-killing process...")
+			if cmd.Process != nil {
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			}
+			return ctx.Err()
+		}
+	}
 }
 
 func summarizeShellCommand(shellParts []string, script string) string {

@@ -315,6 +315,9 @@ func RunCommand(ctx context.Context, cfg *config.AppConfig, result config.Search
 	parallel := result.Command.Parallel == nil || *result.Command.Parallel
 
 	for _, level := range levels {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if parallel && len(level) > 1 {
 			if err := runLevelParallel(ctx, cfg, level, opts); err != nil {
 				return err
@@ -351,6 +354,9 @@ func RunCommand(ctx context.Context, cfg *config.AppConfig, result config.Search
 
 	dir := runner.ResolveDir(*cfg, result.Groups, *result.Command)
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return runner.ExecuteCommand(ctx, result.Command, context, opts, shell, dir)
 }
 

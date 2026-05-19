@@ -1,22 +1,37 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"lota/cli"
 	"lota/runner"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/fatih/color"
 )
 
 func main() {
-	if err := cli.Run(); err != nil {
+	exitCode := 0
+	defer func() {
+		os.Exit(exitCode)
+	}()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := cli.Run(ctx); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		var shellErr *runner.ShellError
 		if errors.As(err, &shellErr) {
 			color.Red("Error: %v\n", err)
-			os.Exit(shellErr.ExitCode)
+			exitCode = shellErr.ExitCode
+		} else {
+			color.Red("Error: %v\n", err)
+			exitCode = 1
 		}
-		color.Red("Error: %v\n", err)
-		os.Exit(1)
 	}
 }

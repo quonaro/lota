@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"lota/config"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -714,5 +716,43 @@ func TestResolveDir_Unit(t *testing.T) {
 				t.Errorf("resolveDir() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestGracefulWait_NormalCompletion(t *testing.T) {
+	cmd := exec.Command("sh", "-c", "exit 0")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	if err := gracefulWait(cmd, context.Background()); err != nil {
+		t.Fatalf("expected nil, got: %v", err)
+	}
+}
+
+func TestGracefulWait_SIGTERM(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	cmd := exec.Command("sleep", "10")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+
+	err := gracefulWait(cmd, ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got: %v", err)
+	}
+
+	if cmd.ProcessState == nil {
+		t.Fatal("process did not exit")
 	}
 }

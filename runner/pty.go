@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os/exec"
@@ -14,7 +15,7 @@ import (
 // This preserves ANSI colors from child processes that check isatty.
 // It returns (false, nil) if PTY allocation fails so the caller can fall back
 // to normal pipes.
-func runWithPTY(cmd *exec.Cmd, stdout, stderr io.Writer) (bool, error) {
+func runWithPTY(cmd *exec.Cmd, stdout, stderr io.Writer, ctx context.Context) (bool, error) {
 	ptmxOut, ptsOut, err := pty.Open()
 	if err != nil {
 		return false, nil
@@ -47,7 +48,7 @@ func runWithPTY(cmd *exec.Cmd, stdout, stderr io.Writer) (bool, error) {
 		_, _ = io.Copy(stderr, ptmxErr)
 	}()
 
-	err = cmd.Wait()
+	err = gracefulWait(cmd, ctx)
 	wg.Wait()
 	return true, err
 }

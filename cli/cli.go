@@ -10,7 +10,7 @@ import (
 )
 
 // Run executes the CLI application
-func Run() error {
+func Run(ctx context.Context) error {
 	if len(os.Args) < 2 {
 		PrintHelp("")
 		return nil
@@ -101,5 +101,5 @@ func Run() error {
 		WorkingDir: cwd,
 		Timeout:    flags.Timeout,
 	}
-	return RunCommand(context.Background(), cfg, result, cmdArgs, opts)
+	return RunCommand(ctx, cfg, result, cmdArgs, opts)
 }

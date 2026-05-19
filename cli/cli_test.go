@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"lota/config"
 	"os"
 	"reflect"
@@ -308,7 +309,7 @@ func TestRun_CompLineNoLongerTriggersCompletion(t *testing.T) {
 		_ = os.Unsetenv("COMP_POINT")
 	}()
 
-	err := Run()
+	err := Run(context.Background())
 	// Should fail with "command not found", NOT silently return nil (completion mode).
 	if err == nil {
 		t.Error("expected error for non-existent command, got nil (possible completion mode leak)")
