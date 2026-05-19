@@ -64,7 +64,7 @@ jobs:
           ./scripts/build.sh
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           tag_name: ${{ steps.version.outputs.NEW_TAG }}
