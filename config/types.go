@@ -16,15 +16,17 @@ type AppConfig struct {
 }
 
 type Group struct {
-	Shell    string `yaml:"shell,omitempty"`
-	Dir      string `yaml:"dir,omitempty"`
-	Name     string
-	Desc     string   `yaml:"desc"`
-	Vars     []Var    `yaml:"vars"`
-	Args     []Arg    `yaml:"-"`
-	RawArgs  []string `yaml:"args"`
-	Commands []Command
-	Groups   []Group
+	Shell        string `yaml:"shell,omitempty"`
+	Dir          string `yaml:"dir,omitempty"`
+	Name         string
+	Desc         string   `yaml:"desc"`
+	Color        string   `yaml:"color,omitempty"`
+	InheritColor *bool    `yaml:"inherit_color,omitempty"`
+	Vars         []Var    `yaml:"vars"`
+	Args         []Arg    `yaml:"-"`
+	RawArgs      []string `yaml:"args"`
+	Commands     []Command
+	Groups       []Group
 
 	// Indexes
 	commandsMap map[string]Command
@@ -32,17 +34,19 @@ type Group struct {
 }
 
 type Command struct {
-	Shell   string `yaml:"shell,omitempty"`
-	Dir     string `yaml:"dir,omitempty"`
-	Name    string
-	Desc    string   `yaml:"desc"`
-	Vars    []Var    `yaml:"vars"`
-	Args    []Arg    `yaml:"-"`
-	RawArgs []string `yaml:"args"`
-	Depends []string `yaml:"depends,omitempty"`
-	Script  string   `yaml:"script"`
-	Before  string   `yaml:"before"`
-	After   string   `yaml:"after"`
+	Shell        string `yaml:"shell,omitempty"`
+	Dir          string `yaml:"dir,omitempty"`
+	Name         string
+	Desc         string   `yaml:"desc"`
+	Color        string   `yaml:"color,omitempty"`
+	InheritColor *bool    `yaml:"inherit_color,omitempty"`
+	Vars         []Var    `yaml:"vars"`
+	Args         []Arg    `yaml:"-"`
+	RawArgs      []string `yaml:"args"`
+	Depends      []string `yaml:"depends,omitempty"`
+	Script       string   `yaml:"script"`
+	Before       string   `yaml:"before"`
+	After        string   `yaml:"after"`
 }
 
 type Arg struct {

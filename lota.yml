@@ -9,11 +9,13 @@ helpwor:
 
 group1:
   desc: Test group 1 description
+  color: cyan
   args:
   - environment|env:str="prod"
   - timeout:int=30
   command1:
     desc: Test command 1
+    inherit_color: true
     args:
     - param1:str
     - param2|p:int=10
@@ -52,6 +54,7 @@ group1:
 
 group2:
   desc: Test group 2 description
+  color: yellow
   command5:
     desc: Test command 5 with positional and wildcard
     args:

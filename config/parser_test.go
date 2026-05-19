@@ -452,6 +452,65 @@ vars:
 			},
 		},
 		{
+			name: "group with color and inherit_color",
+			yamlContent: `dev:
+  desc: Development commands
+  color: yellow
+  run:
+    desc: Run the app
+    inherit_color: true
+    script: go run .
+`,
+			wantErr: false,
+			check: func(t *testing.T, cfg *AppConfig) {
+				if len(cfg.Groups) != 1 {
+					t.Errorf("Expected 1 group, got %d", len(cfg.Groups))
+					return
+				}
+				group := cfg.Groups[0]
+				if group.Color != "yellow" {
+					t.Errorf("Group color = %v, want yellow", group.Color)
+				}
+				if len(group.Commands) != 1 {
+					t.Errorf("Expected 1 command in group, got %d", len(group.Commands))
+					return
+				}
+				cmd := group.Commands[0]
+				if cmd.InheritColor == nil || !*cmd.InheritColor {
+					t.Errorf("Command inherit_color = %v, want true", cmd.InheritColor)
+				}
+			},
+		},
+		{
+			name: "command with color",
+			yamlContent: `build:
+  desc: Build the app
+  color: green
+  script: go build .
+`,
+			wantErr: false,
+			check: func(t *testing.T, cfg *AppConfig) {
+				if len(cfg.Commands) != 1 {
+					t.Errorf("Expected 1 command, got %d", len(cfg.Commands))
+					return
+				}
+				cmd := cfg.Commands[0]
+				if cmd.Color != "green" {
+					t.Errorf("Command color = %v, want green", cmd.Color)
+				}
+			},
+		},
+		{
+			name: "invalid color",
+			yamlContent: `build:
+  desc: Build
+  color: orange
+  script: go build .
+`,
+			wantErr: true,
+			check:   nil,
+		},
+		{
 			name:        "empty config",
 			yamlContent: ``,
 			wantErr:     true,

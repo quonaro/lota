@@ -83,6 +83,93 @@ func TestUsageArgName(t *testing.T) {
 	}
 }
 
+func TestResolveColor(t *testing.T) {
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name         string
+		objColor     string
+		inheritColor *bool
+		ancestors    []*config.Group
+		want         string
+	}{
+		{
+			name:     "direct color wins",
+			objColor: "red",
+			want:     "red",
+		},
+		{
+			name:         "inherit from closest ancestor",
+			inheritColor: &trueVal,
+			ancestors: []*config.Group{
+				{Name: "outer", Color: "blue"},
+				{Name: "inner", Color: "green"},
+			},
+			want: "green",
+		},
+		{
+			name:         "inherit skips ancestor without color",
+			inheritColor: &trueVal,
+			ancestors: []*config.Group{
+				{Name: "outer", Color: "blue"},
+				{Name: "inner", Color: ""},
+			},
+			want: "blue",
+		},
+		{
+			name:         "no inheritance when not set",
+			objColor:     "",
+			inheritColor: nil,
+			ancestors: []*config.Group{
+				{Name: "g", Color: "yellow"},
+			},
+			want: "",
+		},
+		{
+			name:         "inherit disabled explicitly",
+			objColor:     "",
+			inheritColor: &falseVal,
+			ancestors: []*config.Group{
+				{Name: "g", Color: "yellow"},
+			},
+			want: "",
+		},
+		{
+			name:         "empty ancestors with inherit",
+			objColor:     "",
+			inheritColor: &trueVal,
+			ancestors:    []*config.Group{},
+			want:         "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := resolveColor(tt.objColor, tt.inheritColor, tt.ancestors)
+			if got != tt.want {
+				t.Errorf("resolveColor() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestColorize(t *testing.T) {
+	// colorize with empty colorName returns text unchanged
+	if got := colorize("hello", ""); got != "hello" {
+		t.Errorf("colorize(hello, \"\") = %q, want %q", got, "hello")
+	}
+	// colorize with invalid colorName returns text unchanged
+	if got := colorize("hello", "invalid"); got != "hello" {
+		t.Errorf("colorize(hello, invalid) = %q, want %q", got, "hello")
+	}
+	// colorize with valid colorName returns non-empty text (ANSI may be disabled in non-TTY)
+	got := colorize("hello", "red")
+	if got == "" {
+		t.Error("colorize(hello, red) should return non-empty text")
+	}
+}
+
 func TestSeparateArgs(t *testing.T) {
 	args := []config.Arg{
 		{Name: "filename", Type: "str"},            // positional

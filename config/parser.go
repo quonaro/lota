@@ -9,6 +9,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var validColors = map[string]struct{}{
+	"black": {}, "red": {}, "green": {}, "yellow": {}, "blue": {}, "magenta": {}, "cyan": {}, "white": {},
+	"hiblack": {}, "hired": {}, "higreen": {}, "hiyellow": {}, "hiblue": {}, "himagenta": {}, "hicyan": {}, "hiwhite": {},
+}
+
+func isValidColor(c string) bool {
+	if c == "" {
+		return true
+	}
+	_, ok := validColors[strings.ToLower(c)]
+	return ok
+}
+
 // hasField checks if a mapping node has a key with the given name
 func hasField(node *yaml.Node, field string) bool {
 	if node.Kind != yaml.MappingNode {
@@ -108,6 +121,17 @@ func (g *Group) UnmarshalYAML(node *yaml.Node) error {
 			g.Desc = valueNode.Value
 		case "dir":
 			g.Dir = valueNode.Value
+		case "color":
+			g.Color = valueNode.Value
+			if !isValidColor(g.Color) {
+				return fmt.Errorf("invalid color %q for group %q", g.Color, g.Name)
+			}
+		case "inherit_color":
+			var inherit bool
+			if err := valueNode.Decode(&inherit); err != nil {
+				return fmt.Errorf("invalid inherit_color for group %q: %w", g.Name, err)
+			}
+			g.InheritColor = &inherit
 		case "vars":
 			if err := valueNode.Decode(&g.Vars); err != nil {
 				return err
@@ -156,6 +180,17 @@ func (c *Command) UnmarshalYAML(node *yaml.Node) error {
 			c.Desc = node.Content[i+1].Value
 		case "dir":
 			c.Dir = node.Content[i+1].Value
+		case "color":
+			c.Color = node.Content[i+1].Value
+			if !isValidColor(c.Color) {
+				return fmt.Errorf("invalid color %q for command %q", c.Color, c.Name)
+			}
+		case "inherit_color":
+			var inherit bool
+			if err := node.Content[i+1].Decode(&inherit); err != nil {
+				return fmt.Errorf("invalid inherit_color for command %q: %w", c.Name, err)
+			}
+			c.InheritColor = &inherit
 		case "vars":
 			if err := node.Content[i+1].Decode(&c.Vars); err != nil {
 				return err

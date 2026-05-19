@@ -296,6 +296,8 @@ args:           # global argument definitions
 
 group-name:     # command group
   desc: ...
+  color: cyan   # Optional: highlight group name in help
+  inherit_color: true  # Optional: inherit color from parent group
   shell: sh     # Optional: override shell for this group
   vars:         # group-level variables
     - KEY=value
@@ -303,10 +305,12 @@ group-name:     # command group
     - name:type=default
   command-name:
     desc: ...
+    color: green   # Optional: highlight command name in help
     script: ...
 
 command-name:   # top-level command
   desc: ...
+  color: red    # Optional: highlight command name in help
   script: ...
 ```
 
@@ -569,6 +573,34 @@ infra:
 lota infra docker up
 lota infra k8s apply
 ```
+
+### 🎨 Help Colors
+
+Highlight group and command names in `lota help` output using named ANSI colors:
+
+```yaml
+dev:
+  desc: Development commands
+  color: cyan
+  frontend:
+    desc: Frontend commands
+    inherit_color: true
+    start:
+      desc: Start dev server
+      inherit_color: true
+      script: npm run dev
+    build:
+      desc: Build frontend
+      color: yellow
+      script: npm run build
+```
+
+| Option | Description |
+|--------|-------------|
+| `color` | Named ANSI color (`black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, and `hi*` variants) |
+| `inherit_color` | `true` to inherit the nearest ancestor `color`. Defaults to `null` (no inheritance) |
+
+Color resolution priority: **direct `color` > inherited `color` > default**. `inherit_color: true` walks up the group chain and uses the first non-empty color found.
 
 ## 🚩 Global Flags
 

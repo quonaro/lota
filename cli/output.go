@@ -23,6 +23,63 @@ hello:
   script: echo "Hello, $PROJECT!"
 `
 
+var ansiColors = map[string]func(string, ...interface{}) string{
+	"black":     color.BlackString,
+	"red":       color.RedString,
+	"green":     color.GreenString,
+	"yellow":    color.YellowString,
+	"blue":      color.BlueString,
+	"magenta":   color.MagentaString,
+	"cyan":      color.CyanString,
+	"white":     color.WhiteString,
+	"hiblack":   color.HiBlackString,
+	"hired":     color.HiRedString,
+	"higreen":   color.HiGreenString,
+	"hiyellow":  color.HiYellowString,
+	"hiblue":    color.HiBlueString,
+	"himagenta": color.HiMagentaString,
+	"hicyan":    color.HiCyanString,
+	"hiwhite":   color.HiWhiteString,
+}
+
+// resolveColor returns the effective color name for an object,
+// considering its own color and inherited color from ancestor groups.
+func resolveColor(objColor string, inheritColor *bool, ancestors []*config.Group) string {
+	if objColor != "" {
+		return objColor
+	}
+	if inheritColor != nil && *inheritColor {
+		for i := len(ancestors) - 1; i >= 0; i-- {
+			if ancestors[i].Color != "" {
+				return ancestors[i].Color
+			}
+		}
+	}
+	return ""
+}
+
+// colorize applies an ANSI color to text if the color name is valid.
+func colorize(text, colorName string) string {
+	if colorName == "" {
+		return text
+	}
+	fn, ok := ansiColors[strings.ToLower(colorName)]
+	if !ok {
+		return text
+	}
+	return fn(text)
+}
+
+// paddedName prints a colored name with fixed visual width, preserving alignment.
+func paddedName(name, colorName string, width int) string {
+	colored := colorize(name, colorName)
+	padding := width - len(name)
+	if padding < 0 {
+		padding = 0
+	}
+	return colored + strings.Repeat(" ", padding)
+}
+
 // PrintError prints a formatted error message to stderr
 func PrintError(message string) {
 	color.Red("ERROR: %s\n", message)
@@ -86,11 +143,13 @@ func PrintHelp(configPath string) {
 	fmt.Println("Commands:")
 
 	for _, group := range cfg.Groups {
-		fmt.Printf("  %-18s %s\n", group.Name, group.Desc)
+		c := resolveColor(group.Color, group.InheritColor, nil)
+		fmt.Printf("  %s %s\n", paddedName(group.Name, c, 18), group.Desc)
 	}
 
 	for _, cmd := range cfg.Commands {
-		fmt.Printf("  %-18s %s\n", cmd.Name, cmd.Desc)
+		c := resolveColor(cmd.Color, cmd.InheritColor, nil)
+		fmt.Printf("  %s %s\n", paddedName(cmd.Name, c, 18), cmd.Desc)
 	}
 
 	fmt.Println()
@@ -256,6 +315,8 @@ func PrintCommandHelp(cfg *config.AppConfig, result config.SearchResult, verbose
 
 	cmd := *result.Command
 	cmdName := buildCommandName(cmd, result.Groups)
+	c := resolveColor(cmd.Color, cmd.InheritColor, result.Groups)
+	coloredCmdName := colorize(cmdName, c)
 
 	// Resolve all arguments and determine their origin scope
 	args := runner.ResolveArgs(*cfg, result.Groups, cmd)
@@ -263,7 +324,7 @@ func PrintCommandHelp(cfg *config.AppConfig, result config.SearchResult, verbose
 	// Separate positional arguments from flags/options
 	positionalArgs, flagArgs := separateArgs(args)
 
-	fmt.Println(buildCommandUsage(cmdName, positionalArgs, flagArgs))
+	fmt.Println(buildCommandUsage(coloredCmdName, positionalArgs, flagArgs))
 
 	fmt.Println()
 	if cmd.Desc != "" {
@@ -280,7 +341,7 @@ func PrintCommandHelp(cfg *config.AppConfig, result config.SearchResult, verbose
 }
 
 // PrintGroupHelp displays help for a specific group
-func PrintGroupHelp(group *config.Group, verbose bool) {
+func PrintGroupHelp(group *config.Group, ancestors []*config.Group, verbose bool) {
 	// Show group description if available
 	if group.Desc != "" {
 		fmt.Println(group.Desc)
@@ -318,11 +379,17 @@ func PrintGroupHelp(group *config.Group, verbose bool) {
 	fmt.Println("Commands:")
 
 	for _, sub := range group.Groups {
-		fmt.Printf("  %-18s %s\n", sub.Name, sub.Desc)
+		subAncestors := append([]*config.Group(nil), ancestors...)
+		subAncestors = append(subAncestors, group)
+		c := resolveColor(sub.Color, sub.InheritColor, subAncestors)
+		fmt.Printf("  %s %s\n", paddedName(sub.Name, c, 18), sub.Desc)
 	}
 
 	for _, cmd := range group.Commands {
-		fmt.Printf("  %-18s %s\n", cmd.Name, cmd.Desc)
+		cmdAncestors := append([]*config.Group(nil), ancestors...)
+		cmdAncestors = append(cmdAncestors, group)
+		c := resolveColor(cmd.Color, cmd.InheritColor, cmdAncestors)
+		fmt.Printf("  %s %s\n", paddedName(cmd.Name, c, 18), cmd.Desc)
 	}
 
 	if verbose {

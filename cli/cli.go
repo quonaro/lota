@@ -63,7 +63,8 @@ func Run() error {
 		case result.Command != nil:
 			PrintCommandHelp(cfg, result, verbose)
 		case len(result.Groups) > 0:
-			PrintGroupHelp(result.Groups[len(result.Groups)-1], verbose)
+			ancestors := result.Groups[:len(result.Groups)-1]
+			PrintGroupHelp(result.Groups[len(result.Groups)-1], ancestors, verbose)
 		default:
 			PrintHelp(flags.Config)
 		}
@@ -78,7 +79,8 @@ func Run() error {
 	verbose := flags.Verbose || hasVerboseFlag(cmdArgs)
 
 	if len(result.Groups) > 0 && result.Command == nil {
-		PrintGroupHelp(result.Groups[len(result.Groups)-1], verbose)
+		ancestors := result.Groups[:len(result.Groups)-1]
+		PrintGroupHelp(result.Groups[len(result.Groups)-1], ancestors, verbose)
 		return nil
 	}
 
