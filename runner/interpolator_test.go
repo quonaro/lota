@@ -226,16 +226,14 @@ func TestInterpolate(t *testing.T) {
 }
 
 func TestInterpolate_DeprecationWarning(t *testing.T) {
-	// Reset package-level warned map so the test is deterministic.
-	deprecationWarned = make(map[string]bool)
-
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
 	ctx := InterpolationContext{
-		Vars: map[string]string{},
-		Args: map[string]string{"port": "8080"},
+		Vars:              map[string]string{},
+		Args:              map[string]string{"port": "8080"},
+		DeprecationWarned: make(map[string]bool),
 	}
 	_, _ = Interpolate("server --port={{port}}", ctx)
 
@@ -252,16 +250,14 @@ func TestInterpolate_DeprecationWarning(t *testing.T) {
 }
 
 func TestInterpolate_DeprecationWarning_Var(t *testing.T) {
-	// Reset package-level warned map so the test is deterministic.
-	deprecationWarned = make(map[string]bool)
-
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
 
 	ctx := InterpolationContext{
-		Vars: map[string]string{"ENV_VAR": "production"},
-		Args: map[string]string{},
+		Vars:              map[string]string{"ENV_VAR": "production"},
+		Args:              map[string]string{},
+		DeprecationWarned: make(map[string]bool),
 	}
 	_, _ = Interpolate("echo {{ENV_VAR}}", ctx)
 

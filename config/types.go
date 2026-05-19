@@ -18,8 +18,8 @@ type AppConfig struct {
 	Commands []Command  `yaml:"commands"`
 
 	// Indexes
-	commandsMap map[string]Command
-	groupsMap   map[string]Group
+	commandsMap map[string]*Command
+	groupsMap   map[string]*Group
 }
 
 type Group struct {
@@ -37,8 +37,8 @@ type Group struct {
 	Groups       []Group
 
 	// Indexes
-	commandsMap map[string]Command
-	groupsMap   map[string]Group
+	commandsMap map[string]*Command
+	groupsMap   map[string]*Group
 }
 
 type Command struct {
@@ -87,68 +87,68 @@ type SearchResult struct {
 }
 
 func (c *AppConfig) BuildIndexes() error {
-	c.commandsMap = make(map[string]Command)
-	for _, cmd := range c.Commands {
-		if cmd.Name == "" {
+	c.commandsMap = make(map[string]*Command)
+	for i := range c.Commands {
+		if c.Commands[i].Name == "" {
 			return fmt.Errorf("command with empty name")
 		}
-		if _, exists := c.commandsMap[cmd.Name]; exists {
-			return fmt.Errorf("duplicate command name: %s", cmd.Name)
+		if _, exists := c.commandsMap[c.Commands[i].Name]; exists {
+			return fmt.Errorf("duplicate command name: %s", c.Commands[i].Name)
 		}
-		c.commandsMap[cmd.Name] = cmd
+		c.commandsMap[c.Commands[i].Name] = &c.Commands[i]
 	}
 
-	c.groupsMap = make(map[string]Group)
-	for i, group := range c.Groups {
-		if group.Name == "" {
+	c.groupsMap = make(map[string]*Group)
+	for i := range c.Groups {
+		if c.Groups[i].Name == "" {
 			return fmt.Errorf("group with empty name")
 		}
-		if _, exists := c.groupsMap[group.Name]; exists {
-			return fmt.Errorf("duplicate group name: %s", group.Name)
+		if _, exists := c.groupsMap[c.Groups[i].Name]; exists {
+			return fmt.Errorf("duplicate group name: %s", c.Groups[i].Name)
 		}
 		if err := c.Groups[i].BuildIndexes(); err != nil {
-			return fmt.Errorf("group %s: %w", group.Name, err)
+			return fmt.Errorf("group %s: %w", c.Groups[i].Name, err)
 		}
-		c.groupsMap[group.Name] = c.Groups[i]
+		c.groupsMap[c.Groups[i].Name] = &c.Groups[i]
 	}
 	return nil
 }
 
 func (g *Group) BuildIndexes() error {
-	g.commandsMap = make(map[string]Command)
-	for _, cmd := range g.Commands {
-		if cmd.Name == "" {
+	g.commandsMap = make(map[string]*Command)
+	for i := range g.Commands {
+		if g.Commands[i].Name == "" {
 			return fmt.Errorf("command with empty name")
 		}
-		if _, exists := g.commandsMap[cmd.Name]; exists {
-			return fmt.Errorf("duplicate command name: %s", cmd.Name)
+		if _, exists := g.commandsMap[g.Commands[i].Name]; exists {
+			return fmt.Errorf("duplicate command name: %s", g.Commands[i].Name)
 		}
-		g.commandsMap[cmd.Name] = cmd
+		g.commandsMap[g.Commands[i].Name] = &g.Commands[i]
 	}
 
-	g.groupsMap = make(map[string]Group)
-	for i, sub := range g.Groups {
-		if sub.Name == "" {
+	g.groupsMap = make(map[string]*Group)
+	for i := range g.Groups {
+		if g.Groups[i].Name == "" {
 			return fmt.Errorf("group with empty name")
 		}
-		if _, exists := g.groupsMap[sub.Name]; exists {
-			return fmt.Errorf("duplicate group name: %s", sub.Name)
+		if _, exists := g.groupsMap[g.Groups[i].Name]; exists {
+			return fmt.Errorf("duplicate group name: %s", g.Groups[i].Name)
 		}
 		if err := g.Groups[i].BuildIndexes(); err != nil {
-			return fmt.Errorf("group %s: %w", sub.Name, err)
+			return fmt.Errorf("group %s: %w", g.Groups[i].Name, err)
 		}
-		g.groupsMap[sub.Name] = g.Groups[i]
+		g.groupsMap[g.Groups[i].Name] = &g.Groups[i]
 	}
 	return nil
 }
 
 func (c *AppConfig) Find(name string) SearchResult {
 	if cmd, found := c.commandsMap[name]; found {
-		return SearchResult{Exists: true, Command: &cmd}
+		return SearchResult{Exists: true, Command: cmd}
 	}
 
 	if group, found := c.groupsMap[name]; found {
-		return SearchResult{Exists: true, Groups: []*Group{&group}}
+		return SearchResult{Exists: true, Groups: []*Group{group}}
 	}
 
 	return SearchResult{Exists: false}
@@ -156,11 +156,11 @@ func (c *AppConfig) Find(name string) SearchResult {
 
 func (g *Group) Find(name string) SearchResult {
 	if cmd, found := g.commandsMap[name]; found {
-		return SearchResult{Exists: true, Command: &cmd}
+		return SearchResult{Exists: true, Command: cmd}
 	}
 
 	if sub, found := g.groupsMap[name]; found {
-		return SearchResult{Exists: true, Groups: []*Group{&sub}}
+		return SearchResult{Exists: true, Groups: []*Group{sub}}
 	}
 
 	return SearchResult{Exists: false}

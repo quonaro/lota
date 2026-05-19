@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -14,8 +15,6 @@ import (
 	"time"
 )
 
-var shutdownOnce sync.Once
-
 // PrefixWriter wraps an io.Writer and prefixes each line with a task name.
 type PrefixWriter struct {
 	Writer io.Writer
@@ -24,16 +23,39 @@ type PrefixWriter struct {
 }
 
 func (pw *PrefixWriter) Write(p []byte) (n int, err error) {
-	for i, b := range p {
-		pw.buf = append(pw.buf, b)
-		if b == '\n' {
-			if _, err := fmt.Fprintf(pw.Writer, "%s %s", pw.Prefix, pw.buf); err != nil {
-				return i, err
-			}
-			pw.buf = pw.buf[:0]
-		}
+	pw.buf = append(pw.buf, p...)
+	if err := pw.flushLines(); err != nil {
+		return len(p), err
 	}
 	return len(p), nil
+}
+
+// flushLines writes complete lines from buf to the writer with prefix.
+// Handles both \n and \r\n line endings.
+func (pw *PrefixWriter) flushLines() error {
+	for {
+		// Find next newline
+		idx := bytes.IndexByte(pw.buf, '\n')
+		if idx == -1 {
+			break
+		}
+
+		// Check for \r\n and exclude the \r
+		lineEnd := idx
+		if idx > 0 && pw.buf[idx-1] == '\r' {
+			lineEnd = idx - 1
+		}
+
+		// Write the line with prefix
+		line := pw.buf[:lineEnd]
+		if _, err := fmt.Fprintf(pw.Writer, "%s %s\n", pw.Prefix, line); err != nil {
+			return err
+		}
+
+		// Remove the processed line (including \n, and \r if present)
+		pw.buf = pw.buf[idx+1:]
+	}
+	return nil
 }
 
 // Flush writes any remaining buffered bytes without a trailing newline.
@@ -49,12 +71,13 @@ func (pw *PrefixWriter) Flush() error {
 
 // RunOptions controls execution behavior
 type RunOptions struct {
-	Verbose    bool
-	DryRun     bool
-	ConfigDir  string        // base directory for resolving relative dir paths
-	WorkingDir string        // caller's current working directory
-	Timeout    time.Duration // 0 means no timeout
-	Logs       []config.LogConfig
+	Verbose      bool
+	DryRun       bool
+	ConfigDir    string        // base directory for resolving relative dir paths
+	WorkingDir   string        // caller's current working directory
+	Timeout      time.Duration // 0 means no timeout
+	Logs         []config.LogConfig
+	ShutdownOnce *sync.Once // ensures shutdown message prints only once
 }
 
 // ShellError represents a non-zero exit from a shell command.
@@ -86,23 +109,21 @@ func resolveDir(baseDir, workingDir, dir string) string {
 }
 
 // openLogFile opens a log file with the given path and truncate flag.
-// Returns the file and a bool indicating success (false if skipped due to error).
-func openLogFile(path string, truncate bool, dryRun bool) (*os.File, bool) {
+// Returns the file and an error if opening failed.
+func openLogFile(path string, truncate bool, dryRun bool) (*os.File, error) {
 	if dryRun {
 		fmt.Printf("[dry-run] log: %s\n", path)
-		return nil, false
+		return nil, nil
 	}
 
 	// Ensure parent directories exist
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		fmt.Fprintf(os.Stderr, "[log error] %s: failed to create parent directories: %v\n", path, err)
-		return nil, false
+		return nil, fmt.Errorf("failed to create parent directories for %s: %w", path, err)
 	}
 
 	// Verify it's not a directory
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
-		fmt.Fprintf(os.Stderr, "[log error] %s: path is a directory\n", path)
-		return nil, false
+		return nil, fmt.Errorf("path %s is a directory", path)
 	}
 
 	flag := os.O_CREATE | os.O_WRONLY
@@ -114,11 +135,10 @@ func openLogFile(path string, truncate bool, dryRun bool) (*os.File, bool) {
 
 	f, err := os.OpenFile(path, flag, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[log error] %s: %v\n", path, err)
-		return nil, false
+		return nil, fmt.Errorf("failed to open log file %s: %w", path, err)
 	}
 
-	return f, true
+	return f, nil
 }
 
 // closeLogFiles closes all opened log files, swallowing errors.
@@ -145,9 +165,98 @@ func assignOutput(cmd *exec.Cmd, stdoutWriters, stderrWriters []io.Writer) {
 	}
 }
 
+// splitShellCommand splits a shell command string into parts, supporting quoted arguments.
+// Handles both single and double quotes.
+func splitShellCommand(shell string) ([]string, error) {
+	var parts []string
+	var current strings.Builder
+	var inQuote rune
+	var escape bool
+
+	for _, r := range shell {
+		if escape {
+			current.WriteRune(r)
+			escape = false
+			continue
+		}
+
+		switch r {
+		case '\\':
+			escape = true
+		case '"', '\'':
+			switch inQuote {
+			case r:
+				inQuote = 0
+			case 0:
+				inQuote = r
+			default:
+				current.WriteRune(r)
+			}
+		case ' ', '\t':
+			if inQuote == 0 {
+				if current.Len() > 0 {
+					parts = append(parts, current.String())
+					current.Reset()
+				}
+			} else {
+				current.WriteRune(r)
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	if inQuote != 0 {
+		return nil, fmt.Errorf("unclosed quote in shell command")
+	}
+
+	return parts, nil
+}
+
+// buildLogWriters resolves log paths, opens files, and builds writer lists.
+// Returns the list of opened files and the combined stdout/stderr writers.
+func buildLogWriters(logs []config.LogConfig, interpCtx InterpolationContext, baseDir string, dryRun bool, stdout, stderr io.Writer) ([]*os.File, []io.Writer, []io.Writer) {
+	var logFiles []*os.File
+	stdoutWriters := []io.Writer{os.Stdout}
+	stderrWriters := []io.Writer{os.Stderr}
+	if stdout != nil {
+		stdoutWriters = []io.Writer{stdout}
+	}
+	if stderr != nil {
+		stderrWriters = []io.Writer{stderr}
+	}
+
+	for _, logCfg := range logs {
+		interpolatedPath, err := Interpolate(logCfg.Path, interpCtx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[log error] %s: interpolation failed: %v\n", logCfg.Path, err)
+			continue
+		}
+		if !filepath.IsAbs(interpolatedPath) {
+			interpolatedPath = filepath.Join(baseDir, interpolatedPath)
+		}
+		f, err := openLogFile(interpolatedPath, logCfg.Truncate, dryRun)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[log error] %s: %v\n", logCfg.Path, err)
+			continue
+		}
+		if f != nil {
+			logFiles = append(logFiles, f)
+			stdoutWriters = append(stdoutWriters, f)
+			stderrWriters = append(stderrWriters, f)
+		}
+	}
+
+	return logFiles, stdoutWriters, stderrWriters
+}
+
 // executeShell runs a script in shell with environment variables and optional tee logging.
 // If stdout/stderr are nil, os.Stdout/os.Stderr are used.
-func executeShell(ctx context.Context, script string, env []string, shell string, baseDir, workingDir, dir string, logs []config.LogConfig, interpCtx InterpolationContext, dryRun bool, stdout, stderr io.Writer) error {
+func executeShell(ctx context.Context, script string, env []string, shell string, baseDir, workingDir, dir string, logs []config.LogConfig, interpCtx InterpolationContext, dryRun bool, stdout, stderr io.Writer, shutdownOnce *sync.Once) error {
 	// In dry-run mode, only print log targets and skip execution
 	if dryRun {
 		for _, logCfg := range logs {
@@ -165,7 +274,11 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 	}
 
 	// Split shell command and flags (e.g., "bash -c" -> ["bash", "-c"])
-	parts := strings.Fields(shell)
+	// Supports quoted arguments for complex shell commands
+	parts, err := splitShellCommand(shell)
+	if err != nil {
+		return err
+	}
 	if len(parts) == 0 {
 		return fmt.Errorf("empty shell command")
 	}
@@ -174,49 +287,22 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 	cmd.Dir = resolveDir(baseDir, workingDir, dir)
 	setupSysProcAttr(cmd)
 
-	// Resolve log paths and open files
-	var logFiles []*os.File
-	stdoutWriters := []io.Writer{os.Stdout}
-	stderrWriters := []io.Writer{os.Stderr}
-	if stdout != nil {
-		stdoutWriters = []io.Writer{stdout}
-	}
-	if stderr != nil {
-		stderrWriters = []io.Writer{stderr}
-	}
-
-	for _, logCfg := range logs {
-		interpolatedPath, err := Interpolate(logCfg.Path, interpCtx)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "[log error] %s: interpolation failed: %v\n", logCfg.Path, err)
-			continue
-		}
-		// Resolve relative paths against ConfigDir
-		if !filepath.IsAbs(interpolatedPath) {
-			interpolatedPath = filepath.Join(baseDir, interpolatedPath)
-		}
-		f, ok := openLogFile(interpolatedPath, logCfg.Truncate, dryRun)
-		if ok {
-			logFiles = append(logFiles, f)
-			stdoutWriters = append(stdoutWriters, f)
-			stderrWriters = append(stderrWriters, f)
-		}
-	}
+	logFiles, stdoutWriters, stderrWriters := buildLogWriters(logs, interpCtx, baseDir, dryRun, stdout, stderr)
+	defer closeLogFiles(logFiles)
 
 	needsPTY := len(stdoutWriters) != 1 || stdoutWriters[0] != os.Stdout ||
 		len(stderrWriters) != 1 || stderrWriters[0] != os.Stderr
 
-	var err error
 	if needsPTY {
 		stdoutMW := io.MultiWriter(stdoutWriters...)
 		stderrMW := io.MultiWriter(stderrWriters...)
-		used, ptyErr := runWithPTY(cmd, stdoutMW, stderrMW, ctx)
+		used, ptyErr := runWithPTY(cmd, stdoutMW, stderrMW, ctx, shutdownOnce)
 		if !used {
 			assignOutput(cmd, stdoutWriters, stderrWriters)
 			if err = cmd.Start(); err != nil {
 				return fmt.Errorf("start command: %w", err)
 			}
-			err = gracefulWait(cmd, ctx)
+			err = gracefulWait(cmd, ctx, shutdownOnce)
 		} else {
 			err = ptyErr
 		}
@@ -225,9 +311,8 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 		if err = cmd.Start(); err != nil {
 			return fmt.Errorf("start command: %w", err)
 		}
-		err = gracefulWait(cmd, ctx)
+		err = gracefulWait(cmd, ctx, shutdownOnce)
 	}
-	closeLogFiles(logFiles)
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -243,7 +328,7 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 
 // gracefulWait waits for cmd to finish. If ctx is cancelled, it sends SIGTERM
 // to the process group, waits up to 10s, then SIGKILL.
-func gracefulWait(cmd *exec.Cmd, ctx context.Context) error {
+func gracefulWait(cmd *exec.Cmd, ctx context.Context, shutdownOnce *sync.Once) error {
 	done := make(chan error, 1)
 	go func() {
 		done <- cmd.Wait()
@@ -253,9 +338,11 @@ func gracefulWait(cmd *exec.Cmd, ctx context.Context) error {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		shutdownOnce.Do(func() {
-			fmt.Fprintf(os.Stderr, "\r\033[KReceived signal, shutting down gracefully...\n")
-		})
+		if shutdownOnce != nil {
+			shutdownOnce.Do(func() {
+				fmt.Fprintf(os.Stderr, "\r\033[KReceived signal, shutting down gracefully...\n")
+			})
+		}
 		if cmd.Process != nil {
 			_ = terminateProcess(cmd.Process.Pid)
 		}
@@ -295,7 +382,7 @@ func sortedMapKeys(m map[string]string) []string {
 	return keys
 }
 
-func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx InterpolationContext, opts RunOptions, shell string, dir string) error {
+func executeCommandInternal(ctx context.Context, cmd *config.Command, interpCtx InterpolationContext, opts RunOptions, shell string, dir string, stdout, stderr io.Writer, prefix string) error {
 	unified := MergeVarsAndArgs(interpCtx.Vars, interpCtx.Args)
 	env := VarsToEnv(unified)
 	envKeys := sortedMapKeys(unified)
@@ -336,7 +423,7 @@ func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx Interpol
 		if opts.DryRun {
 			fmt.Printf("[dry-run] %s:\n%s\n", name, interpolated)
 		}
-		return executeShell(ctx, interpolated, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun, nil, nil)
+		return executeShell(ctx, interpolated, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun, stdout, stderr, opts.ShutdownOnce)
 	}
 
 	// before hook
@@ -366,18 +453,30 @@ func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx Interpol
 	// fallback hook — runs on any error in before/script/after
 	if failed && cmd.Fallback != "" {
 		if err := runStage("fallback", cmd.Fallback); err != nil {
-			fmt.Fprintf(os.Stderr, "fallback hook failed: %v\n", err)
+			if prefix != "" {
+				fmt.Fprintf(os.Stderr, "%s fallback hook failed: %v\n", prefix, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "fallback hook failed: %v\n", err)
+			}
 		}
 	}
 
 	// finally hook — always runs at the end
 	if cmd.Finally != "" {
 		if err := runStage("finally", cmd.Finally); err != nil {
-			fmt.Fprintf(os.Stderr, "finally hook failed: %v\n", err)
+			if prefix != "" {
+				fmt.Fprintf(os.Stderr, "%s finally hook failed: %v\n", prefix, err)
+			} else {
+				fmt.Fprintf(os.Stderr, "finally hook failed: %v\n", err)
+			}
 		}
 	}
 
 	return execErr
+}
+
+func ExecuteCommand(ctx context.Context, cmd *config.Command, interpCtx InterpolationContext, opts RunOptions, shell string, dir string) error {
+	return executeCommandInternal(ctx, cmd, interpCtx, opts, shell, dir, nil, nil, "")
 }
 
 // ExecuteCommandWithPrefix is like ExecuteCommand but prefixes each line of output with the given prefix.
@@ -387,86 +486,5 @@ func ExecuteCommandWithPrefix(ctx context.Context, cmd *config.Command, interpCt
 	defer func() { _ = stdout.Flush() }()
 	defer func() { _ = stderr.Flush() }()
 
-	unified := MergeVarsAndArgs(interpCtx.Vars, interpCtx.Args)
-	env := VarsToEnv(unified)
-	envKeys := sortedMapKeys(unified)
-
-	if opts.Verbose {
-		fmt.Printf("[verbose] command: %s\n", cmd.Name)
-		fmt.Println("[verbose] env:")
-		for _, k := range envKeys {
-			fmt.Printf("  %s=%s\n", k, unified[k])
-		}
-	}
-
-	if opts.DryRun {
-		fmt.Println("[dry-run] env:")
-		for _, k := range envKeys {
-			fmt.Printf("  %s=%s\n", k, unified[k])
-		}
-	}
-
-	// Apply timeout if specified
-	if opts.Timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
-		defer cancel()
-	}
-
-	var execErr error
-	failed := false
-
-	runStage := func(name, script string) error {
-		interpolated, err := Interpolate(script, interpCtx)
-		if err != nil {
-			return fmt.Errorf("%s hook interpolation failed: %w", name, err)
-		}
-		if opts.Verbose {
-			fmt.Printf("[verbose] %s: %s\n", name, interpolated)
-		}
-		if opts.DryRun {
-			fmt.Printf("[dry-run] %s:\n%s\n", name, interpolated)
-		}
-		return executeShell(ctx, interpolated, env, shell, opts.ConfigDir, opts.WorkingDir, dir, opts.Logs, interpCtx, opts.DryRun, stdout, stderr)
-	}
-
-	// before hook
-	if cmd.Before != "" {
-		if err := runStage("before", cmd.Before); err != nil {
-			execErr = fmt.Errorf("before hook failed: %w", err)
-			failed = true
-		}
-	}
-
-	// script
-	if !failed && cmd.Script != "" {
-		if err := runStage("script", cmd.Script); err != nil {
-			execErr = err
-			failed = true
-		}
-	}
-
-	// after hook — runs only if before and script succeeded
-	if !failed && cmd.After != "" {
-		if err := runStage("after", cmd.After); err != nil {
-			execErr = fmt.Errorf("after hook failed: %w", err)
-			failed = true
-		}
-	}
-
-	// fallback hook — runs on any error in before/script/after
-	if failed && cmd.Fallback != "" {
-		if err := runStage("fallback", cmd.Fallback); err != nil {
-			fmt.Fprintf(os.Stderr, "%s fallback hook failed: %v\n", prefix, err)
-		}
-	}
-
-	// finally hook — always runs at the end
-	if cmd.Finally != "" {
-		if err := runStage("finally", cmd.Finally); err != nil {
-			fmt.Fprintf(os.Stderr, "%s finally hook failed: %v\n", prefix, err)
-		}
-	}
-
-	return execErr
+	return executeCommandInternal(ctx, cmd, interpCtx, opts, shell, dir, stdout, stderr, prefix)
 }
