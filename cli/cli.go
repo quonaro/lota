@@ -87,11 +87,17 @@ func Run() error {
 		return nil
 	}
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
 	opts := runner.RunOptions{
-		Verbose:   flags.Verbose,
-		DryRun:    flags.DryRun,
-		ConfigDir: configDir,
-		Timeout:   flags.Timeout,
+		Verbose:    flags.Verbose,
+		DryRun:     flags.DryRun,
+		ConfigDir:  configDir,
+		WorkingDir: cwd,
+		Timeout:    flags.Timeout,
 	}
 	return RunCommand(context.Background(), cfg, result, cmdArgs, opts)
 }
