@@ -11,6 +11,9 @@
 # Output of the go coverage tool
 *.out
 
+# Logs
+*.log
+
 # Dependency directories
 vendor/
 

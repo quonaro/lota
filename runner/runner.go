@@ -127,6 +127,21 @@ func closeLogFiles(files []*os.File) {
 	}
 }
 
+// assignOutput assigns stdout/stderr to cmd, preserving TTY detection when possible.
+func assignOutput(cmd *exec.Cmd, stdoutWriters, stderrWriters []io.Writer) {
+	if len(stdoutWriters) == 1 && stdoutWriters[0] == os.Stdout {
+		cmd.Stdout = os.Stdout
+	} else {
+		cmd.Stdout = io.MultiWriter(stdoutWriters...)
+	}
+
+	if len(stderrWriters) == 1 && stderrWriters[0] == os.Stderr {
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stderr = io.MultiWriter(stderrWriters...)
+	}
+}
+
 // executeShell runs a script in shell with environment variables and optional tee logging.
 // If stdout/stderr are nil, os.Stdout/os.Stderr are used.
 func executeShell(ctx context.Context, script string, env []string, shell string, baseDir, workingDir, dir string, logs []config.LogConfig, interpCtx InterpolationContext, dryRun bool, stdout, stderr io.Writer) error {
@@ -184,8 +199,7 @@ func executeShell(ctx context.Context, script string, env []string, shell string
 		}
 	}
 
-	cmd.Stdout = io.MultiWriter(stdoutWriters...)
-	cmd.Stderr = io.MultiWriter(stderrWriters...)
+	assignOutput(cmd, stdoutWriters, stderrWriters)
 
 	err := cmd.Run()
 	closeLogFiles(logFiles)

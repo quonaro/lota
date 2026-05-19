@@ -7,6 +7,7 @@ import (
 	"io"
 	"lota/config"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -614,6 +615,48 @@ func TestExecuteCommand_TeeLoggingInterpolation(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "interpolated") {
 		t.Errorf("expected log file to contain 'interpolated', got: %q", string(data))
+	}
+}
+
+func TestAssignOutput_PreservesTTY(t *testing.T) {
+	cmd := exec.Command("echo", "test")
+	assignOutput(cmd, []io.Writer{os.Stdout}, []io.Writer{os.Stderr})
+	if _, ok := cmd.Stdout.(*os.File); !ok {
+		t.Errorf("expected cmd.Stdout to be *os.File, got %T", cmd.Stdout)
+	}
+	if _, ok := cmd.Stderr.(*os.File); !ok {
+		t.Errorf("expected cmd.Stderr to be *os.File, got %T", cmd.Stderr)
+	}
+}
+
+func TestAssignOutput_UsesMultiWriterWithMultipleWriters(t *testing.T) {
+	cmd := exec.Command("echo", "test")
+	buf := new(bytes.Buffer)
+	assignOutput(cmd, []io.Writer{os.Stdout, buf}, []io.Writer{os.Stderr, buf})
+	if _, ok := cmd.Stdout.(*os.File); ok {
+		t.Errorf("expected cmd.Stdout to be io.MultiWriter, got *os.File")
+	}
+	if _, ok := cmd.Stderr.(*os.File); ok {
+		t.Errorf("expected cmd.Stderr to be io.MultiWriter, got *os.File")
+	}
+}
+
+func TestPrefixWriter_WithANSIColorPrefix(t *testing.T) {
+	buf := new(bytes.Buffer)
+	pw := &PrefixWriter{Writer: buf, Prefix: "\033[31m[build]\033[0m"}
+	if _, err := pw.Write([]byte("hello\n")); err != nil {
+		t.Fatalf("pw.Write failed: %v", err)
+	}
+	if err := pw.Flush(); err != nil {
+		t.Fatalf("pw.Flush failed: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "\033[31m[build]\033[0m") {
+		t.Errorf("expected colored prefix in output, got %q", out)
+	}
+	if !strings.Contains(out, "hello") {
+		t.Errorf("expected content 'hello' in output, got %q", out)
 	}
 }
 

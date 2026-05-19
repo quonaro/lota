@@ -643,15 +643,17 @@ deploy:
 
 Dependencies execute with **their own context** (shell, vars, dir, default args). Circular dependencies are detected automatically and produce an error.
 
-Independent dependencies run **in parallel by default**, with output prefixed by task name (like Docker Compose):
+Independent dependencies run **in parallel by default**, with output prefixed by colored task name (like Docker Compose):
 
 ```bash
-[build]  go build -o bin/app .
-[lint]   golangci-lint run
-[build]  ✓ done
-[lint]   ✓ done
-[deploy] ./deploy.sh
+\x1b[35m[build]\x1b[0m  go build -o bin/app .
+\x1b[36m[lint]\x1b[0m   golangci-lint run
+\x1b[35m[build]\x1b[0m  ✓ done
+\x1b[36m[lint]\x1b[0m   ✓ done
+\x1b[33m[deploy]\x1b[0m ./deploy.sh
 ```
+
+Each task gets its own color: either from its `color` field, inherited from a parent group, or a deterministic color derived from the task name.
 
 To force sequential execution, set `parallel: false`:
 

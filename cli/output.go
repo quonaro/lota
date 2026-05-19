@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"lota/config"
 	"lota/runner"
 	"lota/shared"
@@ -109,6 +110,17 @@ func colorize(text, colorName string) string {
 		return text
 	}
 	return fn(text)
+}
+
+// hashColor generates a deterministic hex color from a string using FNV-1a.
+func hashColor(name string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	v := h.Sum32()
+	r := uint8((v >> 16) & 0xFF)
+	g := uint8((v >> 8) & 0xFF)
+	b := uint8(v & 0xFF)
+	return fmt.Sprintf("#%02X%02X%02X", r, g, b)
 }
 
 // paddedName prints a colored name with fixed visual width, preserving alignment.

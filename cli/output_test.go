@@ -5,6 +5,21 @@ import (
 	"testing"
 )
 
+func TestHashColor(t *testing.T) {
+	c1 := hashColor("build")
+	c2 := hashColor("build")
+	if c1 != c2 {
+		t.Errorf("hashColor not deterministic: %q vs %q", c1, c2)
+	}
+	c3 := hashColor("test")
+	if c1 == c3 {
+		t.Errorf("different inputs should produce different colors: %q vs %q", c1, c3)
+	}
+	if len(c1) != 7 || c1[0] != '#' {
+		t.Errorf("expected 7-char hex color starting with #, got %q", c1)
+	}
+}
+
 func TestIsFlagArg(t *testing.T) {
 	tests := []struct {
 		name     string

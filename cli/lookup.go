@@ -372,7 +372,11 @@ func runLevelParallel(ctx context.Context, cfg *config.AppConfig, level []config
 		go func(dep config.SearchResult) {
 			defer wg.Done()
 			path := commandPath(dep.Command, dep.Groups)
-			prefix := fmt.Sprintf("[%s]", path)
+			colorName := resolveColor(dep.Command.Color, dep.Command.InheritColor, dep.Groups)
+			if colorName == "" {
+				colorName = hashColor(path)
+			}
+			prefix := colorize(fmt.Sprintf("[%s]", path), colorName)
 			if err := executeSingleCommand(ctx, cfg, dep, opts, prefix); err != nil {
 				if ctx.Err() == context.Canceled {
 					return // cancelled by another failure
