@@ -80,7 +80,7 @@ jobs:
       image: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm git openssh base-devel
+        run: pacman -Syu --noconfirm git openssh base-devel curl
 
       - uses: actions/checkout@v6
 
