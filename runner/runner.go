@@ -458,6 +458,9 @@ func executeCommandInternal(ctx context.Context, cmd *config.Command, interpCtx 
 			} else {
 				fmt.Fprintf(os.Stderr, "fallback hook failed: %v\n", err)
 			}
+		} else {
+			// fallback succeeded — command is considered recovered
+			execErr = nil
 		}
 	}
 

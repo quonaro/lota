@@ -200,6 +200,18 @@ func TestInterpolate(t *testing.T) {
 			},
 			expected: "echo file1.txt file2.txt file3.txt",
 		},
+		{
+			name:   "dollar var followed by dot punctuation",
+			script: `echo "Invalid type: $type. Use: major, minor, patch, or auto"`,
+			context: InterpolationContext{
+				Vars: map[string]string{},
+				Args: map[string]string{"type": "patch"},
+				ArgDefs: []config.Arg{
+					{Name: "type", Type: "str"},
+				},
+			},
+			expected: `echo "Invalid type: patch. Use: major, minor, patch, or auto"`,
+		},
 	}
 
 	for _, tt := range tests {

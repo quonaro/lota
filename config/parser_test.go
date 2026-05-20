@@ -539,6 +539,45 @@ vars:
 	}
 }
 
+func TestParseConfig_NestedCommandArgs(t *testing.T) {
+	yamlContent := `
+version:
+  desc: Version management commands
+  bump:
+    args:
+    - "type:str=none"
+    desc: Bump version
+    script: |
+      echo $type
+`
+	tmpFile := filepath.Join(t.TempDir(), "test.yml")
+	if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := ParseConfig(tmpFile)
+	if err != nil {
+		t.Fatalf("ParseConfig() error = %v", err)
+	}
+	if len(cfg.Groups) != 1 {
+		t.Fatalf("Expected 1 group, got %d", len(cfg.Groups))
+	}
+	group := cfg.Groups[0]
+	if len(group.Commands) != 1 {
+		t.Fatalf("Expected 1 command, got %d", len(group.Commands))
+	}
+	cmd := group.Commands[0]
+	if cmd.Name != "bump" {
+		t.Errorf("Command name = %v, want bump", cmd.Name)
+	}
+	if len(cmd.Args) != 1 {
+		t.Fatalf("Expected 1 arg, got %d", len(cmd.Args))
+	}
+	if cmd.Args[0].Name != "type" || cmd.Args[0].Type != "str" || cmd.Args[0].Default != "none" {
+		t.Errorf("Arg = %+v, want {Name:type Type:str Default:none}", cmd.Args[0])
+	}
+}
+
 func TestParseConfig_FileNotFound(t *testing.T) {
 	_, err := ParseConfig("/nonexistent/path/config.yml")
 	if err == nil {

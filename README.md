@@ -685,10 +685,10 @@ before → script → after → finally
 | **`before`**   | Preparation (compile, check env)             | Skips `script`, triggers `fallback` |
 | **`script`**   | Main command                                 | Triggers `fallback`                 |
 | **`after`**    | Post-success action (notify, log)            | Triggers `fallback`                 |
-| **`fallback`** | Error handler (rollback, alert)              | Continues to `finally`              |
+| **`fallback`** | Recovery / alternative path (rollback, alert, degrade) | If succeeds, command returns `0`  |
 | **`finally`**  | Cleanup (stop containers, remove temp files) | Always runs                         |
 
-> Return code: `0` if `before`+`script`+`after` succeeded. Otherwise the first error's exit code. `fallback`/`finally` errors are printed to stderr but do not change the return code.
+> Return code: `0` if `before`+`script`+`after` succeeded, **or if `fallback` succeeded after a failure**. Otherwise the first error's exit code. `finally` errors are printed to stderr but do not change the return code.
 
 #### Example 1: Basic Pipeline
 

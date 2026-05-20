@@ -7,6 +7,7 @@ import (
 	"lota/config"
 	"lota/runner"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -255,5 +256,39 @@ func TestRunCommand_PrintsDependencyProgress(t *testing.T) {
 
 	if !strings.Contains(buf.String(), "=> Running dependency: build") {
 		t.Fatalf("expected dependency progress output, got %q", buf.String())
+	}
+}
+
+func TestRunCommand_NestedCommandArgsDefault(t *testing.T) {
+	yamlContent := `
+version:
+  desc: Version management commands
+  bump:
+    args:
+    - "type:str=none"
+    desc: Bump version
+    script: |
+      echo $type
+`
+	tmpFile := filepath.Join(t.TempDir(), "lota.yml")
+	if err := os.WriteFile(tmpFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.ParseConfig(tmpFile)
+	if err != nil {
+		t.Fatalf("ParseConfig() error: %v", err)
+	}
+	if err := cfg.BuildIndexes(); err != nil {
+		t.Fatalf("BuildIndexes() error: %v", err)
+	}
+
+	result, err := FindCommandByPath(cfg, "version.bump")
+	if err != nil {
+		t.Fatalf("FindCommandByPath() error: %v", err)
+	}
+
+	if err := RunCommand(context.Background(), cfg, result, []string{}, runner.RunOptions{DryRun: true}); err != nil {
+		t.Fatalf("RunCommand() error: %v", err)
 	}
 }

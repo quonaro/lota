@@ -11,7 +11,7 @@ import (
 )
 
 var placeholderRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
-var dollarVarRegex = regexp.MustCompile(`\$([a-zA-Z_][a-zA-Z0-9_.]*)`)
+var dollarVarRegex = regexp.MustCompile(`\$([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)`)
 
 // ValidationError represents an interpolation validation error
 type ValidationError struct {

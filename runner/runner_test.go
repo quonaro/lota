@@ -321,8 +321,8 @@ func TestExecuteCommand_FallbackRunsOnScriptFailure(t *testing.T) {
 	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
 
 	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
-	if err == nil {
-		t.Fatal("expected script error, got nil")
+	if err != nil {
+		t.Fatalf("expected nil after successful fallback, got %v", err)
 	}
 
 	if _, err := os.Stat(fallbackMarker); err != nil {
@@ -343,8 +343,8 @@ func TestExecuteCommand_FallbackRunsOnBeforeFailure(t *testing.T) {
 	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
 
 	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
-	if err == nil {
-		t.Fatal("expected before error, got nil")
+	if err != nil {
+		t.Fatalf("expected nil after successful fallback, got %v", err)
 	}
 
 	if _, err := os.Stat(fallbackMarker); err != nil {
@@ -365,8 +365,8 @@ func TestExecuteCommand_FallbackRunsOnAfterFailure(t *testing.T) {
 	ctx := InterpolationContext{Vars: map[string]string{}, Args: map[string]string{}}
 
 	err := ExecuteCommand(context.Background(), cmd, ctx, RunOptions{}, "sh -c", "")
-	if err == nil {
-		t.Fatal("expected after error, got nil")
+	if err != nil {
+		t.Fatalf("expected nil after successful fallback, got %v", err)
 	}
 
 	if _, err := os.Stat(fallbackMarker); err != nil {
